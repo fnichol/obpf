@@ -50,11 +50,16 @@ TOUCH = /usr/bin/touch
 UNAME = /usr/bin/uname
 XARGS = /usr/bin/xargs
 
+.if defined(MFLAGS)
+MAKE_WITH_FLAGS = ${MAKE} ${MFLAGS}
+.endif
 
 #
 # Global path locations
 #
 DISTDIR ?= ${.CURDIR}/distfiles
+_DISTDIR := ${DISTDIR}
+FULLDISTDIR ?= ${_DISTDIR}
 
 
 #
@@ -68,20 +73,39 @@ ECHO_MSG ?= ${ECHO}
 FTP_KEEPALIVE ?= 0
 FETCH_CMD ?= ${FTP} -V -m -k ${FTP_KEEPALIVE}
 
+.if defined(verbose-show)
+.MAIN: verbose-show
+.elif defined(show)
+.MAIN: show
+.elif defined(clean)
+.MAIN: clean
+.elif defined(_internal-clean)
+clean = ${_internal-clean}
+.MAIN: _internal-clean
+.else
+.MAIN: all
+.endif
 
-#
-# Basic master sites configuration
-#
-
-# Master URL to the OpenBSD source
-MASTER_SITE_OPENBSD_HOST ?= ftp://ftp.openbsd.org
-MASTER_SITE_OPENBSD_DIR ?= pub/OpenBSD/${OSREV}
-MASTER_SITE_OPENBSD := ${MASTER_SITE_OPENBSD_HOST}/${MASTER_SITE_OPENBSD_DIR}
-
-# Master URL to the OpenBSD patches
-MASTER_SITE_PATCH_HOST ?= ${MASTER_SITE_OPENBSD_HOST}
-MASTER_SITE_PATCH_DIR ?= pub/OpenBSD/patches
-MASTER_SITE_PATCH := ${MASTER_SITE_PATCH_HOST}/${MASTER_SITE_PATCH_DIR}
+# need to go through an extra var because clean is set in stone,
+# on the cmdline.
+_clean = ${clean}
+.if empty(_clean) || ${_clean:L} == "depends"
+_clean += work
+.endif
+.if ${_clean:L:Mwork}
+_clean += fake
+.endif
+.if ${_clean:L:Mforce}
+_clean += -f
+.endif
+# check that clean is clean
+_okay_words = depends work fake -f flavors dist install sub packages package \
+	readmes bulk force plist
+.for _w in ${_clean:L}
+.  if !${_okay_words:M${_w}}
+ERRORS += "Fatal: unknown clean command: ${_w}"
+.  endif
+.endfor
 
 # Default OpenBSD site
 _MASTER_SITE_OPENBSD ?= \
@@ -137,26 +161,25 @@ _DISTFILES_SRC ?= \
 DISTFILES ?= ${_DISTFILES_OS} ${_DISTFILES_SRC}
 
 _EVERYTHING = ${DISTFILES}
+_DISTFILES = ${DISTFILES:C/:[0-9]$//}
+ALLFILES = ${_DISTFILES}
+
+
+
 
 _internal-fetch:
 .  if target(pre-fetch)
 	@cd ${.CURDIR} && exec ${MAKE} pre-fetch
 .  endif
-.  if target(do-fetch)
-	@cd ${.CURDIR} && exec ${MAKE} do-fetch
-.  else
-# What FETCH normally does:
-.    if !empty(ALLFILES)
-	@cd ${.CURDIR} && exec ${MAKE} ${ALLFILES:S@^@${FULLDISTDIR}/@}
-.    endif
-# End of FETCH
+.  if !empty(ALLFILES)
+	@cd ${.CURDIR} && exec ${MAKE} ${MFLAGS} ${ALLFILES:S@^@${FULLDISTDIR}/@}
 .  endif
 .  if target(post-fetch)
 	@cd ${.CURDIR} && exec ${MAKE} post-fetch
 .  endif
 
 # Seperate target for each file fetch will retrieve
-.for _F in ${ALLFILES:S@^@${FULLDITDIR}/@}
+.for _F in ${ALLFILES:S@^@${FULLDISTDIR}/@}
 ${_F}:
 	@mkdir -p ${_F:H}; \
 	cd ${_F:H}; \
@@ -167,11 +190,42 @@ ${_F}:
 	for site in $$sites; do \
 		${ECHO_MSG} ">> Fetch $${site}$$f."; \
 		if ${FETCH_CMD} $${site}$$f; then \
-# @TODO: enter MD5 sum checking on downloaded component
 			exit 0; \
 		fi; \
 	done; exit 1
 .endfor
 
 
-.include <bsd.own.mk>
+# Top-level targets redirect to the real _internal-target
+.for _t in fetch clean
+${_t}: _internal-${_t}
+.endfor
+
+
+#####################################################
+# Cleaning up
+#####################################################
+_internal-clean:
+	@${ECHO_MSG} "===>  Cleaning"
+.if ${_clean:L:Mdist}
+	@${ECHO_MSG} "===>  Dist cleaning"
+	@if cd ${DISTDIR} 2>/dev/null; then \
+		rm -f ${ALLFILES}; \
+	fi
+	@rm -rf ${FULLDISTDIR}
+.endif
+
+
+#####################################################
+# Convenience targets
+#####################################################
+
+distclean:
+	@cd ${.CURDIR} && exec ${MAKE} clean=dist
+
+peek-ftp:
+	@mkdir -p ${FULLDISTDIR}; cd ${FULLDISTDIR}; echo "cd ${FULLDISTDIR}"; \
+	for i in ${MASTER_SITES:Mftp*}; do \
+		echo "Connecting to $$i"; ${FETCH_CMD} $$i ; break; \
+	done
+
