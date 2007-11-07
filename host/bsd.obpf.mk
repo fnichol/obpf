@@ -25,13 +25,6 @@
 
 .include "bsd.obpf.common.mk"
 
-# Master URL to the OpenBSD source
-MASTER_SITE_OPENBSD_HOST ?= ftp://ftp.openbsd.org
-MASTER_SITE_OPENBSD_DIR ?= pub/OpenBSD/$(OSREV)
-MASTER_SITE_OPENBSD := ${MASTER_SITE_OPENBSD_HOST}/${MASTER_SITE_OPENBSD_DIR}
-
-# Master URL to the OpenBSD patches
-MASTER_SITE_PATCH_HOST ?= ${MASTER_SITE_OPENBSD_HOST}
-MASTER_SITE_PATCH_DIR ?= pub/OpenBSD/patches
-MASTER_SITE_PATCH := ${MASTER_SITE_PATCH_HOST}/${MASTER_SITE_PATCH_DIR}
+# Global path locations
+DISTDIR ?= ${.CURDIR}/distfiles
 
