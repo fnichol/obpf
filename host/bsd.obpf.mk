@@ -57,6 +57,15 @@ DISTDIR ?= ${.CURDIR}/distfiles
 _DISTDIR := ${DISTDIR}
 FULLDISTDIR ?= ${_DISTDIR}
 
+DISTNAME ?= openbsd-${OSREV}
+WRKDIR ?= ${.CURDIR}/w-${DISTNAME}
+
+
+_WRKDIR_COOKIE = ${WRKDIR}/.extract_started
+_EXTRACT_COOKIE = ${WRKDIR}/.extract_done
+
+_MAKE_COOKIE = ${TOUCH}
+
 
 #
 # Common commands and operations
@@ -199,6 +208,23 @@ _internal-checksum: _internal-fetch
 		${ECHO_MSG} "are up to date."; \
 		exit 1; \
 	fi
+
+# The cookie's recipe hold the real rule for each of these targets
+_internal-extract: ${_EXTRACT_COOKIE}
+
+
+# The real targets. Note that some parts always get run, some parts can be
+# disabled, and there are hooks to override behavior.
+
+${_WRKDIR_COOKIE}:
+	@rm -rf ${WRKDIR}
+	@mkdir -p ${WRKDIR}
+	@${_MAKE_COOKIE} $@
+
+${_EXTRACT_COOKIE}: ${_WRKDIR_COOKIE}
+	@cd ${.CURDIR} && exec ${MAKE} _internal-checksum
+	@${ECHO_MSG} "===>  Extracting for ${DESTNAME}"
+####
 
 
 # Seperate target for each file fetch will retrieve
