@@ -31,6 +31,7 @@
 AWK = /usr/bin/awk
 BASENAME = /usr/bin/basename
 CHMOD = /bin/chmod
+CHROOT = /usr/sbin/chroot
 CP = /bin/cp
 DIRNAME = /usr/bin/dirname
 ECHO = /bin/echo
@@ -42,11 +43,13 @@ HEAD = /usr/bin/head
 LS = /bin/ls
 MD5 = /bin/md5
 MKDIR = /bin/mkdir
+MOUNT_MFS = /sbin/mount_mfs
 MV = /bin/mv
 PATCH = /usr/bin/patch
 SED = /usr/bin/sed
 TAR = /bin/tar
 TOUCH = /usr/bin/touch
+UMOUNT = /sbin/umount
 UNAME = /usr/bin/uname
 XARGS = /usr/bin/xargs
 
@@ -105,6 +108,8 @@ FTP_KEEPALIVE ?= 0
 FETCH_CMD ?= ${FTP} -V -m -k ${FTP_KEEPALIVE}
 
 CHECKSUM_FILE ?= ${FULLDISTDIR}/${OSREV}/${MACHINE}/MD5
+
+CHROOT_SHELL ?= /bin/ksh -li
 
 .if defined(verbose-show)
 .MAIN: verbose-show
@@ -241,6 +246,7 @@ _internal-checksum: _internal-fetch
 
 # The cookie's recipe hold the real rule for each of these targets
 _internal-extract: ${_EXTRACT_COOKIE}
+_internal-build: ${_BUILD_COOKIE}
 
 
 # The real targets. Note that some parts always get run, some parts can be
@@ -287,6 +293,63 @@ do-extract:
 .endif
 
 
+${_BUILD_COOKIE}: ${_EXTRACT_COOKIE}
+	@${ECHO_MSG} "===>  Building for ${DISTNAME}"
+.if target(pre-build)
+	@cd ${.CURDIR} && exec ${MAKE} pre-build
+.endif
+	@cd ${.CURDIR} && exec ${MAKE} do-build
+.if target(post-build)
+	@cd ${.CURDIR} && exec ${MAKE} post-build
+.endif
+	@${_MAKE_COOKIE} $@
+
+
+.if !target(do-build)
+do-build:
+	@${ECHO_MSG} -n "===> Preparing /dev ... "
+	@${SUDO} ${MV} ${WRKDIST}/dev ${WRKDIST}/dev.orig
+	@${SUDO} ${INSTALL} -d -m 0755 -o 0 -g 0 ${WRKDIST}/dev
+	@${ECHO_MSG} "Done."
+	@${ECHO_MSG} -n "===> Installing chroot Makefile ... "
+	@${SUDO} ${INSTALL_DATA} ${.CURDIR}/bsd.obpf.chroot.mk ${WRKDIST}
+	@${SUDO} ${INSTALL_DATA} ${.CURDIR}/bsd.obpf.common.mk ${WRKDIST}
+	@${ECHO_MSG} "Done."
+.endif
+
+_internal-chroot: ${_BUILD_COOKIE}
+	@${ECHO_MSG} "===>  chrooting into ${DISTNAME}"
+	@cd ${.CURDIR} && exec ${MAKE} pre-chroot
+	@cd ${.CURDIR} && exec ${MAKE} do-chroot
+	@cd ${.CURDIR} && exec ${MAKE} post-chroot
+
+
+.if !target(pre-chroot)
+pre-chroot:
+	@${ECHO_MSG} "===>  Creating standard devices for chroot environment"
+	@${SUDO} ${MOUNT_MFS} -o nosuid -s 8192 swap ${WRKDIST}/dev
+	@${SUDO} ${CP} -p ${WRKDIST}/dev.orig/MAKEDEV ${WRKDIST}/dev/
+	@cd ${WRKDIST}/dev/ && ${SUDO} ./MAKEDEV std
+	@${ECHO_MSG} "===>  Creating copies of system files in chroot environment"
+	@${SUDO} ${CP} -p /etc/resolv.conf ${WRKDIST}/etc/
+	@${SUDO} ${CP} -p /etc/hosts ${WRKDIST}/etc/
+.endif
+
+
+.if !target(do-chroot)
+do-chroot:
+	@cd ${.CURDIR} && ${SUDO} exec ${CHROOT} ${WRKDIST} ${CHROOT_SHELL}
+.endif
+
+
+.if !target(post-chroot)
+post-chroot:
+	@${ECHO_MSG} -n "===>  Removing chroot environment standard devices ... "
+	@${SUDO} ${UMOUNT} -f ${WRKDIST}/dev
+	@${ECHO_MSG} "Done."
+.endif
+
+
 # Seperate target for each file fetch will retrieve
 .for _F in ${ALLFILES:S@^@${FULLDISTDIR}/@}
 ${_F}:
@@ -306,7 +369,7 @@ ${_F}:
 
 
 # Top-level targets redirect to the real _internal-target
-.for _t in fetch checksum extract clean
+.for _t in fetch checksum extract build chroot clean
 ${_t}: _internal-${_t}
 .endfor
 
