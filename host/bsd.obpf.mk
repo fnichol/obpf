@@ -50,10 +50,6 @@ TOUCH = /usr/bin/touch
 UNAME = /usr/bin/uname
 XARGS = /usr/bin/xargs
 
-.if defined(MFLAGS)
-MAKE_WITH_FLAGS = ${MAKE} ${MFLAGS}
-.endif
-
 #
 # Global path locations
 #
@@ -72,6 +68,8 @@ ECHO_MSG ?= ${ECHO}
 # Used to fetch any remote file
 FTP_KEEPALIVE ?= 0
 FETCH_CMD ?= ${FTP} -V -m -k ${FTP_KEEPALIVE}
+
+CHECKSUM_FILE ?= ${FULLDISTDIR}/${OSREV}/${MACHINE}/MD5
 
 .if defined(verbose-show)
 .MAIN: verbose-show
@@ -145,6 +143,7 @@ _SITE_SELECTOR += *) sites="${MASTER_SITES}";; esac
 
 # Default OpenBSD packages tar blobs to fetch
 _DISTFILES_OS ?= \
+	${OSREV}/${MACHINE}/MD5 \
 	${OSREV}/${MACHINE}/base${OSrev}.tgz \
 	${OSREV}/${MACHINE}/etc${OSrev}.tgz \
 	${OSREV}/${MACHINE}/comp${OSrev}.tgz \
@@ -172,11 +171,35 @@ _internal-fetch:
 	@cd ${.CURDIR} && exec ${MAKE} pre-fetch
 .  endif
 .  if !empty(ALLFILES)
-	@cd ${.CURDIR} && exec ${MAKE} ${MFLAGS} ${ALLFILES:S@^@${FULLDISTDIR}/@}
+	@cd ${.CURDIR} && exec ${MAKE} ${ALLFILES:S@^@${FULLDISTDIR}/@}
 .  endif
 .  if target(post-fetch)
 	@cd ${.CURDIR} && exec ${MAKE} post-fetch
 .  endif
+
+
+_internal-checksum: _internal-fetch
+	@cd ${CHECKSUM_FILE:H}; OK=true; \
+	for file in ${_DISTFILES_OS}; do \
+		filename=`basename $$file`; \
+		if [ "$$filename" == "${CHECKSUM_FILE:T}" ]; then continue; fi; \
+		if ! grep "^MD5 ($$filename) = " ${CHECKSUM_FILE} > /dev/null; then \
+			${ECHO_MSG} ">> No checksum recorded for $$file."; \
+			OK=false; \
+		else \
+			grep "^MD5 ($$filename) = " ${CHECKSUM_FILE} | md5 -c; \
+			if [ "$$?" -ne "0" ]; then \
+				echo ">> Checksum mismatch for $$file."; \
+				OK=false; \
+			fi; \
+		fi; \
+	done; \
+	if ! $$OK; then \
+		${ECHO_MSG} "Make sure the Makefile and checksum file (${CHECKSUM_FILE})"; \
+		${ECHO_MSG} "are up to date."; \
+		exit 1; \
+	fi
+
 
 # Seperate target for each file fetch will retrieve
 .for _F in ${ALLFILES:S@^@${FULLDISTDIR}/@}
@@ -197,7 +220,7 @@ ${_F}:
 
 
 # Top-level targets redirect to the real _internal-target
-.for _t in fetch clean
+.for _t in fetch checksum clean
 ${_t}: _internal-${_t}
 .endfor
 
