@@ -244,7 +244,7 @@ do-extract:
 		${SUDO} tar xpfz ${DISTDIR}/$$file -C ${WRKDIST}; \
 		${ECHO_MSG} "Done."; \
 	done
-	for file in ${_DISTFILES_SRC}; do \
+	@for file in ${_DISTFILES_SRC}; do \
 		${ECHO_MSG} -n "===> Extracting `basename $$file` ... "; \
 		${SUDO} tar xpfz ${DISTDIR}/$$file -C ${WRKDIST}/usr/src; \
 		${ECHO_MSG} "Done."; \
