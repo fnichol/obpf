@@ -59,6 +59,7 @@ FULLDISTDIR ?= ${_DISTDIR}
 
 DISTNAME ?= openbsd-${OSREV}
 WRKDIR ?= ${.CURDIR}/w-${DISTNAME}
+WRKDIST ?= ${WRKDIR}/${DISTNAME}
 
 
 _WRKDIR_COOKIE = ${WRKDIR}/.extract_started
@@ -223,8 +224,27 @@ ${_WRKDIR_COOKIE}:
 
 ${_EXTRACT_COOKIE}: ${_WRKDIR_COOKIE}
 	@cd ${.CURDIR} && exec ${MAKE} _internal-checksum
-	@${ECHO_MSG} "===>  Extracting for ${DESTNAME}"
-####
+	@${ECHO_MSG} "===>  Extracting for ${DISTNAME}"
+.if target(pre-extract)
+	@cd ${.CURDIR} && exec ${MAKE} pre-extract
+.endif
+	@cd ${.CURDIR} && exec ${MAKE} do-extract
+.if target(post-extract)
+	@cd ${.CURDIR} && exec ${MAKE} post-extract
+.endif
+	@${_MAKE_COOKIE} $@
+
+
+.if !target(do-extract)
+do-extract:
+	@mkdir -p ${WRKDIST}; \
+	for file in ${_DISTFILES_OS}; do \
+		if [ "`basename $$file`" == "${CHECKSUM_FILE:T}" ]; then continue; fi; \
+		${ECHO_MSG} -n "===> Extracting `basename $$file` ... "; \
+		${SUDO} tar xpfz ${DISTDIR}/$$file -C ${WRKDIST}; \
+		${ECHO_MSG} "Done."; \
+	done
+.endif
 
 
 # Seperate target for each file fetch will retrieve
@@ -246,7 +266,7 @@ ${_F}:
 
 
 # Top-level targets redirect to the real _internal-target
-.for _t in fetch checksum clean
+.for _t in fetch checksum extract clean
 ${_t}: _internal-${_t}
 .endfor
 
