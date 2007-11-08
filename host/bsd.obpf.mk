@@ -317,6 +317,9 @@ do-build:
 	@${ECHO_MSG} "Done."
 	@${ECHO_MSG} -n "===> Customizing /etc/profile ... "
 	@${ECHO} 'if [ "$$SHELL" == "/bin/ksh" ]; then . /etc/ksh.kshrc; PS1="(obpf):\\W# "; fi' > ${WRKDIST}/etc/profile
+	@${CP} -p ${WRKDIST}/etc/ksh.kshrc ${WRKDIST}/etc/ksh.kshrc.orig; \
+	grep -v 'tty=`basename $$tty`$$' ${WRKDIST}/etc/ksh.kshrc.orig > \
+	${WRKDIST}/etc/ksh.kshrc && rm ${WRKDIST}/etc/ksh.kshrc.orig
 	@${ECHO_MSG} "Done."
 .endif
 
@@ -341,7 +344,7 @@ pre-chroot:
 
 .if !target(do-chroot)
 do-chroot:
-	@cd ${.CURDIR} && ${SUDO} exec ${CHROOT} ${WRKDIST} ${CHROOT_SHELL}
+	-@cd ${.CURDIR} && ${SUDO} exec ${CHROOT} ${WRKDIST} ${CHROOT_SHELL}
 .endif
 
 
