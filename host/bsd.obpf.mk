@@ -237,11 +237,16 @@ ${_EXTRACT_COOKIE}: ${_WRKDIR_COOKIE}
 
 .if !target(do-extract)
 do-extract:
-	@mkdir -p ${WRKDIST}; \
-	for file in ${_DISTFILES_OS}; do \
+	@mkdir -p ${WRKDIST}
+	@for file in ${_DISTFILES_OS}; do \
 		if [ "`basename $$file`" == "${CHECKSUM_FILE:T}" ]; then continue; fi; \
 		${ECHO_MSG} -n "===> Extracting `basename $$file` ... "; \
 		${SUDO} tar xpfz ${DISTDIR}/$$file -C ${WRKDIST}; \
+		${ECHO_MSG} "Done."; \
+	done
+	for file in ${_DISTFILES_SRC}; do \
+		${ECHO_MSG} -n "===> Extracting `basename $$file` ... "; \
+		${SUDO} tar xpfz ${DISTDIR}/$$file -C ${WRKDIST}/usr/src; \
 		${ECHO_MSG} "Done."; \
 	done
 .endif
@@ -276,6 +281,10 @@ ${_t}: _internal-${_t}
 #####################################################
 _internal-clean:
 	@${ECHO_MSG} "===>  Cleaning"
+.if ${_clean:L:Mwork}
+	@if [ -L ${WRKDIR} ]; then rm -rf `readlink ${WRKDIR}`; fi
+	@rm -rf ${WRKDIR}
+.endif
 .if ${_clean:L:Mdist}
 	@${ECHO_MSG} "===>  Dist cleaning"
 	@if cd ${DISTDIR} 2>/dev/null; then \
