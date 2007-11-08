@@ -64,8 +64,33 @@ WRKDIST ?= ${WRKDIR}/${DISTNAME}
 
 _WRKDIR_COOKIE = ${WRKDIR}/.extract_started
 _EXTRACT_COOKIE = ${WRKDIR}/.extract_done
+_BUILD_COOKIE = ${WRKDIR}/.build_done
 
 _MAKE_COOKIE = ${TOUCH}
+
+.include <bsd.own.mk>
+
+#
+# A few aliases for *-install targets
+#
+INSTALL_PROGRAM = \
+	${INSTALL} ${INSTALL_COPY} ${INSTALL_STRIP} \
+		-o ${BINOWN} -g ${BINGRP} -m ${BINMODE}
+INSTALL_SCRIPT = \
+	${INSTALL} ${INSTALL_COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE}
+INSTALL_DATA = \
+	${INSTALL} ${INSTALL_COPY} -o ${SHAREOWN} -g ${SHAREGRP} -m ${SHAREMODE}
+INSTALL_MAN = \
+	${INSTALL} ${INSTALL_COPY} -o ${MANOWN} -g ${MANGRP} -m ${MANMODE}
+
+INSTALL_PROGRAM_DIR = \
+	${INSTALL} -d -o ${BINOWN} -g ${BINGRP} -m ${DIRMODE}
+INSTALL_SCRIPT_DIR = \
+	${INSTALL_PROGRAM_DIR}
+INSTALL_DATA_DIR = \
+	${INSTALL} -d -o ${SHAREOWN} -g ${SHAREGRP} -m ${DIRMODE}
+INSTALL_MAN_DIR = \
+	${INSTALL} -d -o ${MANOWN} -g ${MANGRP} -m ${DIRMODE}
 
 
 #
@@ -167,7 +192,11 @@ _DISTFILES_SRC ?= \
 	${OSREV}/sys.tar.gz \
 	${OSREV}/xenocara.tar.gz \
 
-DISTFILES ?= ${_DISTFILES_OS} ${_DISTFILES_SRC}
+# Any additional kernel configurations to be installed into the source tree
+# These must be available from either an FTP or HTTP server
+KERNELCONFS ?=
+
+DISTFILES ?= ${_DISTFILES_OS} ${_DISTFILES_SRC} ${KERNELCONFS}
 
 _EVERYTHING = ${DISTFILES}
 _DISTFILES = ${DISTFILES:C/:[0-9]$//}
@@ -238,15 +267,21 @@ ${_EXTRACT_COOKIE}: ${_WRKDIR_COOKIE}
 .if !target(do-extract)
 do-extract:
 	@mkdir -p ${WRKDIST}
-	@for file in ${_DISTFILES_OS}; do \
+	@for file in ${_DISTFILES_OS:C/:[0-9]$//}; do \
 		if [ "`basename $$file`" == "${CHECKSUM_FILE:T}" ]; then continue; fi; \
 		${ECHO_MSG} -n "===> Extracting `basename $$file` ... "; \
 		${SUDO} tar xpfz ${DISTDIR}/$$file -C ${WRKDIST}; \
 		${ECHO_MSG} "Done."; \
 	done
-	@for file in ${_DISTFILES_SRC}; do \
+	@for file in ${_DISTFILES_SRC:C/:[0-9]$//}; do \
 		${ECHO_MSG} -n "===> Extracting `basename $$file` ... "; \
 		${SUDO} tar xpfz ${DISTDIR}/$$file -C ${WRKDIST}/usr/src; \
+		${ECHO_MSG} "Done."; \
+	done
+	@for file in ${KERNELCONFS:C/:[0-9]$//}; do \
+		${ECHO_MSG} -n "===> Extracting Kernel config `basename $$file` ... "; \
+		${SUDO} ${INSTALL} -m 0644 -o 0 -g 0 ${DISTDIR}/$$file \
+			${WRKDIST}/usr/src/sys/arch/${MACHINE}/conf; \
 		${ECHO_MSG} "Done."; \
 	done
 .endif
