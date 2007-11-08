@@ -315,6 +315,9 @@ do-build:
 	@${SUDO} ${INSTALL_DATA} ${.CURDIR}/bsd.obpf.chroot.mk ${WRKDIST}
 	@${SUDO} ${INSTALL_DATA} ${.CURDIR}/bsd.obpf.common.mk ${WRKDIST}
 	@${ECHO_MSG} "Done."
+	@${ECHO_MSG} -n "===> Customizing /etc/profile ... "
+	@${ECHO} 'if [ "$$SHELL" == "/bin/ksh" ]; then . /etc/ksh.kshrc; PS1="(obpf):\\W# "; fi' > ${WRKDIST}/etc/profile
+	@${ECHO_MSG} "Done."
 .endif
 
 _internal-chroot: ${_BUILD_COOKIE}
