@@ -47,6 +47,7 @@ MOUNT_MFS = /sbin/mount_mfs
 MV = /bin/mv
 PATCH = /usr/bin/patch
 SED = /usr/bin/sed
+SORT = /usr/bin/sort
 TAR = /bin/tar
 TOUCH = /usr/bin/touch
 UMOUNT = /sbin/umount
@@ -311,6 +312,13 @@ do-extract-patches:
 	done
 
 
+_internal-sync:
+	@rm -f ${DISTDIR}/${_DISTFILES_PATCHSET}
+	@cd ${.CURDIR} && \
+	exec ${MAKE} ${_DISTFILES_PATCHSET:C/:[0-9]$//:S@^@${FULLDISTDIR}/@}
+	@cd ${.CURDIR} && exec ${MAKE} do-extract-patches
+
+
 ${_BUILD_COOKIE}: ${_EXTRACT_COOKIE}
 	@${ECHO_MSG} "===>  Building for ${DISTNAME}"
 .if target(pre-build)
@@ -393,7 +401,7 @@ ${_F}:
 
 
 # Top-level targets redirect to the real _internal-target
-.for _t in fetch checksum extract build chroot clean
+.for _t in fetch checksum extract build chroot clean sync
 ${_t}: _internal-${_t}
 .endfor
 
@@ -428,4 +436,9 @@ peek-ftp:
 	for i in ${MASTER_SITES:Mftp*}; do \
 		echo "Connecting to $$i"; ${FETCH_CMD} $$i ; break; \
 	done
+
+list-patchfiles: ${_EXTRACT_COOKIE}
+	@${ECHO_MSG} "===> Listing patchset for ${DISTNAME}";
+	@cd ${PATCHDIST} && \
+	${FIND} ${OSREV}/common ${OSREV}/${MACHINE} -type f | ${SORT} -t '/' -k 3
 
