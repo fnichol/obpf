@@ -63,6 +63,7 @@ FULLDISTDIR ?= ${_DISTDIR}
 DISTNAME ?= openbsd-${OSREV}
 WRKDIR ?= ${.CURDIR}/w-${DISTNAME}
 WRKDIST ?= ${WRKDIR}/${DISTNAME}
+PATCHDIST ?= ${WRKDIR}/patches-${OSREV}
 
 
 _WRKDIR_COOKIE = ${WRKDIR}/.extract_started
@@ -197,17 +198,20 @@ _DISTFILES_SRC ?= \
 	${OSREV}/sys.tar.gz \
 	${OSREV}/xenocara.tar.gz \
 
+# Default OpenBSD patch tar blob to fetch
+_DISTFILES_PATCHSET ?= \
+	patches/${OSREV}.tar.gz
+
 # Any additional kernel configurations to be installed into the source tree
 # These must be available from either an FTP or HTTP server
 KERNELCONFS ?=
 
-DISTFILES ?= ${_DISTFILES_OS} ${_DISTFILES_SRC} ${KERNELCONFS}
+DISTFILES ?= ${_DISTFILES_OS} ${_DISTFILES_SRC} \
+	${KERNELCONFS} ${_DISTFILES_PATCHSET}
 
 _EVERYTHING = ${DISTFILES}
 _DISTFILES = ${DISTFILES:C/:[0-9]$//}
 ALLFILES = ${_DISTFILES}
-
-
 
 
 _internal-fetch:
@@ -290,7 +294,21 @@ do-extract:
 			${WRKDIST}/usr/src/sys/arch/${MACHINE}/conf; \
 		${ECHO_MSG} "Done."; \
 	done
+	@cd ${.CURDIR} && exec ${MAKE} do-extract-patches
 .endif
+
+
+do-extract-patches:
+	@mkdir -p ${PATCHDIST}
+	@for file in ${_DISTFILES_PATCHSET:C/:[0-9]$//}; do \
+		cd ${DISTDIR}/`dirname $$file` && \
+		if ! ${MD5} -c ${WRKDIR}/.`basename $$file`.md5 > /dev/null 2>&1; then \
+			${ECHO_MSG} -n "===> Extracting patchset for `basename $$file` ... "; \
+			${SUDO} tar xpfz ${DISTDIR}/$$file -C ${PATCHDIST}; \
+			md5 `basename $$file` > ${WRKDIR}/.`basename $$file`.md5; \
+			${ECHO_MSG} "Done."; \
+		fi; \
+	done
 
 
 ${_BUILD_COOKIE}: ${_EXTRACT_COOKIE}
