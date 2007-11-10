@@ -45,7 +45,7 @@ MD5 = /bin/md5
 MKDIR = /bin/mkdir
 MOUNT_MFS = /sbin/mount_mfs
 MV = /bin/mv
-PATCH = /usr/bin/patch
+PATCH_CMD = /usr/bin/patch
 SED = /usr/bin/sed
 SORT = /usr/bin/sort
 TAR = /bin/tar
@@ -112,6 +112,10 @@ FETCH_CMD ?= ${FTP} -V -m -k ${FTP_KEEPALIVE}
 CHECKSUM_FILE ?= ${FULLDISTDIR}/${OSREV}/${MACHINE}/MD5
 
 CHROOT_SHELL ?= /bin/ksh -li
+
+.if defined(PATCH)
+PATCHFILE != find ${PATCHDIST} -type f -name ${PATCH:T}
+.endif
 
 .if defined(verbose-show)
 .MAIN: verbose-show
@@ -406,6 +410,21 @@ ${_t}: _internal-${_t}
 .endfor
 
 
+_check-patchfile:
+.if !defined(PATCH)
+	@${ECHO_MSG}
+	@${ECHO_MSG} ">> Variable PATCH (or P) not defined!"
+	@${ECHO_MSG} ">> usage: make PATCH=<patchfile> <action>"
+.else
+	@if [ ! -e "${PATCHFILE}" ]; then \
+		echo ">> A patch file ${PATCH} could not be found"; \
+		echo ">> To list all patch files, run:"; \
+		echo ">> make list-patchfiles"; \
+		exit 1; \
+	fi
+.endif
+
+
 #####################################################
 # Cleaning up
 #####################################################
@@ -431,14 +450,23 @@ _internal-clean:
 distclean:
 	@cd ${.CURDIR} && exec ${MAKE} clean=dist
 
+
 peek-ftp:
 	@mkdir -p ${FULLDISTDIR}; cd ${FULLDISTDIR}; echo "cd ${FULLDISTDIR}"; \
 	for i in ${MASTER_SITES:Mftp*}; do \
 		echo "Connecting to $$i"; ${FETCH_CMD} $$i ; break; \
 	done
 
+
 list-patchfiles: ${_EXTRACT_COOKIE}
-	@${ECHO_MSG} "===> Listing patchset for ${DISTNAME}";
+	@${ECHO_MSG} "===> Listing patch files for ${DISTNAME}";
 	@cd ${PATCHDIST} && \
 	${FIND} ${OSREV}/common ${OSREV}/${MACHINE} -type f | ${SORT} -t '/' -k 3
+
+
+info: _check-patchfile
+	@${ECHO_MSG} "===> Instructions for ${PATCH:T}"
+	@numlines=`$(GREP) -n '^Index: ' ${PATCHFILE} | \
+		$(HEAD) -n 1 | $(AWK) -F':' '{print $$1}'`; \
+		$(HEAD) -n `$(ECHO) $$(($$numlines-1))` $(PATCHFILE)
 
