@@ -69,7 +69,7 @@ PATCHDIST ?= ${WRKDIR}/patches-${OSREV}
 
 _WRKDIR_COOKIE = ${WRKDIR}/.extract_started
 _EXTRACT_COOKIE = ${WRKDIR}/.extract_done
-_BUILD_COOKIE = ${WRKDIR}/.build_done
+_CONFIGURE_COOKIE = ${WRKDIR}/.configure_done
 _PRE_PATCH_COOKIE = ${WRKDIR}/.pre_patch_${PATCH:T}_done
 _PATCH_COOKIE = ${WRKDIR}/.patch_${PATCH:T}_done
 
@@ -257,7 +257,7 @@ _internal-checksum: _internal-fetch
 
 # The cookie's recipe hold the real rule for each of these targets
 _internal-extract: ${_EXTRACT_COOKIE}
-_internal-build: ${_BUILD_COOKIE}
+_internal-configure: ${_CONFIGURE_COOKIE}
 _internal-patch: ${_PATCH_COOKIE}
 
 
@@ -327,20 +327,20 @@ _internal-sync:
 	@cd ${.CURDIR} && exec ${MAKE} do-extract-patches
 
 
-${_BUILD_COOKIE}: ${_EXTRACT_COOKIE}
-	@${ECHO_MSG} "===>  Building for ${DISTNAME}"
-.if target(pre-build)
-	@cd ${.CURDIR} && exec ${MAKE} pre-build
+${_CONFIGURE_COOKIE}: ${_EXTRACT_COOKIE}
+	@${ECHO_MSG} "===>  Configure chroot for ${DISTNAME}"
+.if target(pre-configure)
+	@cd ${.CURDIR} && exec ${MAKE} pre-configure
 .endif
-	@cd ${.CURDIR} && exec ${MAKE} do-build
-.if target(post-build)
-	@cd ${.CURDIR} && exec ${MAKE} post-build
+	@cd ${.CURDIR} && exec ${MAKE} do-configure
+.if target(post-configure)
+	@cd ${.CURDIR} && exec ${MAKE} post-configure
 .endif
 	@${_MAKE_COOKIE} $@
 
 
-.if !target(do-build)
-do-build:
+.if !target(do-configure)
+do-configure:
 	@${ECHO_MSG} -n "===> Preparing /dev ... "
 	@${SUDO} ${MV} ${WRKDIST}/dev ${WRKDIST}/dev.orig
 	@${SUDO} ${INSTALL} -d -m 0755 -o 0 -g 0 ${WRKDIST}/dev
@@ -357,7 +357,7 @@ do-build:
 	@${ECHO_MSG} "Done."
 .endif
 
-_internal-chroot: ${_BUILD_COOKIE}
+_internal-chroot: ${_CONFIGURE_COOKIE}
 	@${ECHO_MSG} "===>  chrooting into ${DISTNAME}"
 	@cd ${.CURDIR} && exec ${MAKE} pre-chroot
 	@cd ${.CURDIR} && exec ${MAKE} do-chroot
@@ -409,7 +409,7 @@ ${_F}:
 
 
 # Top-level targets redirect to the real _internal-target
-.for _t in fetch checksum extract build patch chroot clean sync
+.for _t in fetch checksum extract configure patch chroot clean sync
 ${_t}: _internal-${_t}
 .endfor
 
@@ -429,7 +429,7 @@ _check-patchfile:
 .endif
 
 
-${_PATCH_COOKIE}: ${_BUILD_COOKIE}
+${_PATCH_COOKIE}: ${_CONFIGURE_COOKIE}
 	@${ECHO_MSG} "===>  Patching for ${PATCH:T}"
 .if target(pre-patch)
 	@cd ${.CURDIR} && exec ${MAKE} pre-patch
