@@ -70,6 +70,8 @@ PATCHDIST ?= ${WRKDIR}/patches-${OSREV}
 _WRKDIR_COOKIE = ${WRKDIR}/.extract_started
 _EXTRACT_COOKIE = ${WRKDIR}/.extract_done
 _BUILD_COOKIE = ${WRKDIR}/.build_done
+_PRE_PATCH_COOKIE = ${WRKDIR}/.pre_patch_${PATCH:T}_done
+_PATCH_COOKIE = ${WRKDIR}/.patch_${PATCH:T}_done
 
 _MAKE_COOKIE = ${TOUCH}
 
@@ -256,6 +258,7 @@ _internal-checksum: _internal-fetch
 # The cookie's recipe hold the real rule for each of these targets
 _internal-extract: ${_EXTRACT_COOKIE}
 _internal-build: ${_BUILD_COOKIE}
+_internal-patch: ${_PATCH_COOKIE}
 
 
 # The real targets. Note that some parts always get run, some parts can be
@@ -265,6 +268,7 @@ ${_WRKDIR_COOKIE}:
 	@rm -rf ${WRKDIR}
 	@mkdir -p ${WRKDIR}
 	@${_MAKE_COOKIE} $@
+
 
 ${_EXTRACT_COOKIE}: ${_WRKDIR_COOKIE}
 	@cd ${.CURDIR} && exec ${MAKE} _internal-checksum
@@ -405,7 +409,7 @@ ${_F}:
 
 
 # Top-level targets redirect to the real _internal-target
-.for _t in fetch checksum extract build chroot clean sync
+.for _t in fetch checksum extract build patch chroot clean sync
 ${_t}: _internal-${_t}
 .endfor
 
@@ -422,6 +426,25 @@ _check-patchfile:
 		echo ">> make list-patchfiles"; \
 		exit 1; \
 	fi
+.endif
+
+
+${_PATCH_COOKIE}: ${_BUILD_COOKIE}
+	@${ECHO_MSG} "===>  Patching for ${PATCH:T}"
+.if target(pre-patch)
+	@cd ${.CURDIR} && exec ${MAKE} pre-patch
+.endif
+	@cd ${.CURDIR} && exec ${MAKE} do-patch
+.if target(post-patch)
+	@cd ${.CURDIR} && exec ${MAKE} post-patch
+.endif
+	@${_MAKE_COOKIE} $@
+
+
+.if !target(do-patch)
+do-patch:
+	@${_MAKE_COOKIE} ${_PRE_PATCH_COOKIE}
+	@cd ${WRKDIST}/usr/src && ${PATCH_CMD} -p0 < ${PATCHFILE}
 .endif
 
 
