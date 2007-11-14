@@ -70,8 +70,9 @@ PATCHDIST ?= ${WRKDIR}/patches-${OSREV}
 _WRKDIR_COOKIE = ${WRKDIR}/.extract_started
 _EXTRACT_COOKIE = ${WRKDIR}/.extract_done
 _CONFIGURE_COOKIE = ${WRKDIR}/.configure_done
-_PRE_PATCH_COOKIE = ${WRKDIR}/.pre_patch_${PATCH:T}_done
-_PATCH_COOKIE = ${WRKDIR}/.patch_${PATCH:T}_done
+_PRE_PATCH_COOKIE = ${WRKDIR}/.${PATCH:T}-pre_patch_done
+_PATCH_COOKIE = ${WRKDIR}/.${PATCH:T}-patch_done
+_BUILD_COOKIE = ${WRKDIR}/.${PATCH:T}-build_done
 
 _MAKE_COOKIE = ${TOUCH}
 
@@ -114,6 +115,10 @@ FETCH_CMD ?= ${FTP} -V -m -k ${FTP_KEEPALIVE}
 CHECKSUM_FILE ?= ${FULLDISTDIR}/${OSREV}/${MACHINE}/MD5
 
 CHROOT_SHELL ?= /bin/ksh -li
+
+.if defined(P)
+PATCH = ${P}
+.endif
 
 .if defined(PATCH)
 PATCHFILE != find ${PATCHDIST} -type f -name ${PATCH:T}
@@ -219,6 +224,14 @@ DISTFILES ?= ${_DISTFILES_OS} ${_DISTFILES_SRC} \
 _EVERYTHING = ${DISTFILES}
 _DISTFILES = ${DISTFILES:C/:[0-9]$//}
 ALLFILES = ${_DISTFILES}
+
+_PATCHFILES != \
+	if [ -d "${PATCHDIST}/${OSREV}/common" -a \
+	-d "${PATCHDIST}/${OSREV}/${MACHINE}" ]; then \
+		${FIND} ${PATCHDIST}/${OSREV}/common ${PATCHDIST}/${OSREV}/${MACHINE} \
+		-type f | ${SORT} -t '/' -k 3; \
+	fi
+PATCHFILES = ${_PATCHFILES:T}
 
 
 _internal-fetch:
@@ -430,7 +443,7 @@ _check-patchfile:
 
 
 ${_PATCH_COOKIE}: ${_CONFIGURE_COOKIE}
-	@${ECHO_MSG} "===>  Patching for ${PATCH:T}"
+	@${ECHO_MSG} "===> Patching for ${PATCH:T}"
 .if target(pre-patch)
 	@cd ${.CURDIR} && exec ${MAKE} pre-patch
 .endif
@@ -445,6 +458,20 @@ ${_PATCH_COOKIE}: ${_CONFIGURE_COOKIE}
 do-patch:
 	@${_MAKE_COOKIE} ${_PRE_PATCH_COOKIE}
 	@cd ${WRKDIST}/usr/src && ${PATCH_CMD} -p0 < ${PATCHFILE}
+.endif
+
+
+.if target(${PATCH:T})
+${_BUILD_COOKIE}: ${PATCH_COOKIE}
+	@${ECHO_MSG} "===> Building for ${PATCH:T}"
+.  if target(pre-build)
+	@cd ${.CURDIR} && exec ${MAKE} pre-build
+.  endif
+	@cd ${.CURDIR} && exec ${MAKE} ${PATCH:T}
+.  if target(post-build)
+	@cd ${.CURDIR} && exec ${MAKE} post-build
+.  endif
+	@${_MAKE_COOKIE} $@
 .endif
 
 
@@ -483,8 +510,9 @@ peek-ftp:
 
 list-patchfiles: ${_EXTRACT_COOKIE}
 	@${ECHO_MSG} "===> Listing patch files for ${DISTNAME}";
-	@cd ${PATCHDIST} && \
-	${FIND} ${OSREV}/common ${OSREV}/${MACHINE} -type f | ${SORT} -t '/' -k 3
+	@for file in ${PATCHFILES}; do\
+		${ECHO_MSG} "$$file"; \
+	done
 
 
 info: _check-patchfile
