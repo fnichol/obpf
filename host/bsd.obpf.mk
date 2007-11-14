@@ -486,7 +486,7 @@ do-patch:
 # Building
 #####################################################
 .if target(${PATCH})
-${_BUILD_COOKIE}: ${PATCH_COOKIE}
+${_BUILD_COOKIE}: ${_PATCH_COOKIE}
 	@cd ${.CURDIR} && exec ${MAKE} _check-patchfile PATCH=${PATCH}
 	@${ECHO_MSG} "===> Building for ${PATCH}"
 .  if target(pre-build)
@@ -502,7 +502,7 @@ ${_BUILD_COOKIE}: ${PATCH_COOKIE}
 .  endif
 	@${_MAKE_COOKIE} $@
 .else
-${_BUILD_COOKIE}: ${PATCH_COOKIE}
+${_BUILD_COOKIE}: ${_PATCH_COOKIE}
 	@cd ${.CURDIR} && exec ${MAKE} _check-patchfile PATCH=${PATCH}
 	@${ECHO_MSG} ">> No target with name \"${PATCH}\" has been defined."
 	@${ECHO_MSG}
@@ -513,7 +513,7 @@ ${_BUILD_COOKIE}: ${PATCH_COOKIE}
 .endif
 
 
-KERNEL = GENERIC
+KERNEL ?= GENERIC
 
 #####################################################
 # Cleaning up
