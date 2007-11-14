@@ -236,6 +236,9 @@ PATCHFILES = ${_PATCHFILES:T}
 PATCHES = ${PATCHFILES:C/\.patch$//}
 
 
+#####################################################
+# Fetching
+#####################################################
 _internal-fetch:
 .  if target(pre-fetch)
 	@cd ${.CURDIR} && exec ${MAKE} pre-fetch
@@ -248,6 +251,30 @@ _internal-fetch:
 .  endif
 
 
+#####################################################
+# Fetch targets
+#####################################################
+# Seperate target for each file fetch will retrieve
+.for _F in ${ALLFILES:S@^@${FULLDISTDIR}/@}
+${_F}:
+	@mkdir -p ${_F:H}; \
+	cd ${_F:H}; \
+	select=${_EVERYTHING:M*${_F:S@^${FULLDISTDIR}/@@}\:[0-9]}; \
+	f=${_F:S@^${FULLDISTDIR}/@@}; \
+	${ECHO_MSG} ">> $$f doesn't seem to exist on this system."; \
+	${_SITE_SELECTOR}; \
+	for site in $$sites; do \
+		${ECHO_MSG} ">> Fetch $${site}$$f."; \
+		if ${FETCH_CMD} $${site}$$f; then \
+			exit 0; \
+		fi; \
+	done; exit 1
+.endfor
+
+
+#####################################################
+# Checksumming
+#####################################################
 _internal-checksum: _internal-fetch
 	@cd ${CHECKSUM_FILE:H}; OK=true; \
 	for file in ${_DISTFILES_OS}; do \
@@ -270,6 +297,7 @@ _internal-checksum: _internal-fetch
 		exit 1; \
 	fi
 
+
 # The cookie's recipe hold the real rule for each of these targets
 _internal-extract: ${_EXTRACT_COOKIE}
 _internal-configure: ${_CONFIGURE_COOKIE}
@@ -280,11 +308,13 @@ _internal-build: ${_BUILD_COOKIE}
 # The real targets. Note that some parts always get run, some parts can be
 # disabled, and there are hooks to override behavior.
 
+#####################################################
+# System extraction
+#####################################################
 ${_WRKDIR_COOKIE}:
 	@rm -rf ${WRKDIR}
 	@mkdir -p ${WRKDIR}
 	@${_MAKE_COOKIE} $@
-
 
 ${_EXTRACT_COOKIE}: ${_WRKDIR_COOKIE}
 	@cd ${.CURDIR} && exec ${MAKE} _internal-checksum
@@ -297,7 +327,6 @@ ${_EXTRACT_COOKIE}: ${_WRKDIR_COOKIE}
 	@cd ${.CURDIR} && exec ${MAKE} post-extract
 .endif
 	@${_MAKE_COOKIE} $@
-
 
 .if !target(do-extract)
 do-extract:
@@ -322,7 +351,6 @@ do-extract:
 	@cd ${.CURDIR} && exec ${MAKE} do-extract-patches
 .endif
 
-
 do-extract-patches:
 	@mkdir -p ${PATCHDIST}
 	@for file in ${_DISTFILES_PATCHSET:C/:[0-9]$//}; do \
@@ -335,7 +363,6 @@ do-extract-patches:
 		fi; \
 	done
 
-
 _internal-sync:
 	@rm -f ${DISTDIR}/${_DISTFILES_PATCHSET}
 	@cd ${.CURDIR} && \
@@ -343,6 +370,9 @@ _internal-sync:
 	@cd ${.CURDIR} && exec ${MAKE} do-extract-patches
 
 
+#####################################################
+# Final system configuration
+#####################################################
 ${_CONFIGURE_COOKIE}: ${_EXTRACT_COOKIE}
 	@${ECHO_MSG} "===>  Configure chroot for ${DISTNAME}"
 .if target(pre-configure)
@@ -373,12 +403,15 @@ do-configure:
 	@${ECHO_MSG} "Done."
 .endif
 
+
+#####################################################
+# Chrooting
+#####################################################
 _internal-chroot: ${_CONFIGURE_COOKIE}
 	@${ECHO_MSG} "===>  chrooting into ${DISTNAME}"
 	@cd ${.CURDIR} && exec ${MAKE} pre-chroot
 	@cd ${.CURDIR} && exec ${MAKE} do-chroot
 	@cd ${.CURDIR} && exec ${MAKE} post-chroot
-
 
 .if !target(pre-chroot)
 pre-chroot:
@@ -391,12 +424,10 @@ pre-chroot:
 	@${SUDO} ${CP} -p /etc/hosts ${WRKDIST}/etc/
 .endif
 
-
 .if !target(do-chroot)
 do-chroot:
 	-@cd ${.CURDIR} && ${SUDO} exec ${CHROOT} ${WRKDIST} ${CHROOT_SHELL}
 .endif
-
 
 .if !target(post-chroot)
 post-chroot:
@@ -405,23 +436,6 @@ post-chroot:
 	@${ECHO_MSG} "Done."
 .endif
 
-
-# Seperate target for each file fetch will retrieve
-.for _F in ${ALLFILES:S@^@${FULLDISTDIR}/@}
-${_F}:
-	@mkdir -p ${_F:H}; \
-	cd ${_F:H}; \
-	select=${_EVERYTHING:M*${_F:S@^${FULLDISTDIR}/@@}\:[0-9]}; \
-	f=${_F:S@^${FULLDISTDIR}/@@}; \
-	${ECHO_MSG} ">> $$f doesn't seem to exist on this system."; \
-	${_SITE_SELECTOR}; \
-	for site in $$sites; do \
-		${ECHO_MSG} ">> Fetch $${site}$$f."; \
-		if ${FETCH_CMD} $${site}$$f; then \
-			exit 0; \
-		fi; \
-	done; exit 1
-.endfor
 
 
 # Top-level targets redirect to the real _internal-target
@@ -445,6 +459,9 @@ _check-patchfile:
 .endif
 
 
+#####################################################
+# Patching
+#####################################################
 ${_PATCH_COOKIE}: ${_CONFIGURE_COOKIE}
 	@cd ${.CURDIR} && exec ${MAKE} _check-patchfile PATCH=${PATCH}
 	@${ECHO_MSG} "===> Patching for ${PATCH}"
@@ -465,6 +482,9 @@ do-patch:
 .endif
 
 
+#####################################################
+# Building
+#####################################################
 .if target(${PATCH})
 ${_BUILD_COOKIE}: ${PATCH_COOKIE}
 	@cd ${.CURDIR} && exec ${MAKE} _check-patchfile PATCH=${PATCH}
