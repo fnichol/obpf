@@ -272,7 +272,7 @@ ${_WRKDIR_COOKIE}:
 
 ${_EXTRACT_COOKIE}: ${_WRKDIR_COOKIE}
 	@cd ${.CURDIR} && exec ${MAKE} _internal-checksum
-	@${ECHO_MSG} "===>  Extracting for ${DISTNAME}"
+	@${ECHO_MSG} "===> Extracting for ${DISTNAME}"
 .if target(pre-extract)
 	@cd ${.CURDIR} && exec ${MAKE} pre-extract
 .endif
