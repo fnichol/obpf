@@ -71,9 +71,10 @@ PATCHDIST ?= ${WRKDIR}/patches-${OSREV}
 _WRKDIR_COOKIE = ${WRKDIR}/.extract_started
 _EXTRACT_COOKIE = ${WRKDIR}/.extract_done
 _CONFIGURE_COOKIE = ${WRKDIR}/.configure_done
-_PRE_PATCH_COOKIE = ${WRKDIR}/.${PATCH:T}-pre_patch_done
-_PATCH_COOKIE = ${WRKDIR}/.${PATCH:T}-patch_done
-_BUILD_COOKIE = ${WRKDIR}/.${PATCH:T}-build_done
+_PRE_PATCH_COOKIE = ${WRKDIR}/.${PATCH}-pre_patch_done
+_PATCH_COOKIE = ${WRKDIR}/.${PATCH}-patch_done
+_BUILD_COOKIE = ${WRKDIR}/.${PATCH}-build_done
+_PLIST_COOKIE = ${WRKDIR}/.${PATCH}.plist
 
 _MAKE_COOKIE = ${TOUCH}
 
@@ -303,6 +304,7 @@ _internal-extract: ${_EXTRACT_COOKIE}
 _internal-configure: ${_CONFIGURE_COOKIE}
 _internal-patch: ${_PATCH_COOKIE}
 _internal-build: ${_BUILD_COOKIE}
+_internal-plist: ${_PLIST_COOKIE}
 
 
 # The real targets. Note that some parts always get run, some parts can be
@@ -441,7 +443,7 @@ post-chroot:
 
 
 # Top-level targets redirect to the real _internal-target
-.for _t in fetch checksum extract configure patch build chroot clean sync
+.for _t in fetch checksum extract configure patch build plist chroot clean sync
 ${_t}: _internal-${_t}
 .endfor
 
@@ -513,6 +515,32 @@ ${_BUILD_COOKIE}: ${_PATCH_COOKIE}
 	@${ECHO_MSG}
 	@exit 1
 .endif
+
+
+#####################################################
+# Creating a packing list (plist)
+#####################################################
+${_PLIST_COOKIE}: ${_BUILD_COOKIE}
+	@cd ${.CURDIR} && exec ${MAKE} _check-patchfile PATCH=${PATCH}
+	@${ECHO_MSG} "===> Building plist for ${PATCH}"
+.if target(pre-plist)
+	@cd ${.CURDIR} && exec ${MAKE} pre-plist
+.endif
+	@cd ${.CURDIR} && exec ${MAKE} do-plist
+.if target(post-plist)
+	@cd ${.CURDIR} && exec ${MAKE} post-plist
+.endif
+
+.if !target(do-plist)
+do-plist:
+	@${FIND} ${WRKDIST} -path ${WRKDIST}/usr/src -prune -or \
+		-path ${WRKDIST}/usr/obj -prune -or \
+		-newer ${_PRE_PATCH_COOKIE} -a ! -newer ${_BUILD_COOKIE} -type f | \
+		${SED} 's,^${WRKDIST},.,' | \
+		${GREP} -v '/usr/src' | ${GREP} -v '/usr/obj'	> ${_PLIST_COOKIE}
+.endif
+
+
 
 
 KERNEL ?= GENERIC
