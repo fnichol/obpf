@@ -40,6 +40,7 @@ FIND = /usr/bin/find
 FTP = /usr/bin/ftp
 GREP = /usr/bin/grep
 HEAD = /usr/bin/head
+KSH = /bin/ksh
 LS = /bin/ls
 MD5 = /bin/md5
 MKDIR = /bin/mkdir
@@ -121,7 +122,7 @@ PATCH = ${P}
 .endif
 
 .if defined(PATCH)
-PATCHFILE != find ${PATCHDIST} -type f -name ${PATCH:T}
+PATCHFILE != find ${PATCHDIST} -type f -name ${PATCH}.patch
 .endif
 
 .if defined(verbose-show)
@@ -232,6 +233,7 @@ _PATCHFILES != \
 		-type f | ${SORT} -t '/' -k 3; \
 	fi
 PATCHFILES = ${_PATCHFILES:T}
+PATCHES = ${PATCHFILES:C/\.patch$//}
 
 
 _internal-fetch:
@@ -272,6 +274,7 @@ _internal-checksum: _internal-fetch
 _internal-extract: ${_EXTRACT_COOKIE}
 _internal-configure: ${_CONFIGURE_COOKIE}
 _internal-patch: ${_PATCH_COOKIE}
+_internal-build: ${_BUILD_COOKIE}
 
 
 # The real targets. Note that some parts always get run, some parts can be
@@ -422,7 +425,7 @@ ${_F}:
 
 
 # Top-level targets redirect to the real _internal-target
-.for _t in fetch checksum extract configure patch chroot clean sync
+.for _t in fetch checksum extract configure patch build chroot clean sync
 ${_t}: _internal-${_t}
 .endfor
 
@@ -434,16 +437,17 @@ _check-patchfile:
 	@${ECHO_MSG} ">> usage: make PATCH=<patchfile> <action>"
 .else
 	@if [ ! -e "${PATCHFILE}" ]; then \
-		echo ">> A patch file ${PATCH} could not be found"; \
-		echo ">> To list all patch files, run:"; \
-		echo ">> make list-patchfiles"; \
+		${ECHO_MSG} ">> A patch with name \"${PATCH}\" could not be found."; \
+		${ECHO_MSG} ">> To list all patches, run: make list-patches"; \
+		${ECHO_MSG}; \
 		exit 1; \
 	fi
 .endif
 
 
 ${_PATCH_COOKIE}: ${_CONFIGURE_COOKIE}
-	@${ECHO_MSG} "===> Patching for ${PATCH:T}"
+	@cd ${.CURDIR} && exec ${MAKE} _check-patchfile PATCH=${PATCH}
+	@${ECHO_MSG} "===> Patching for ${PATCH}"
 .if target(pre-patch)
 	@cd ${.CURDIR} && exec ${MAKE} pre-patch
 .endif
@@ -461,19 +465,35 @@ do-patch:
 .endif
 
 
-.if target(${PATCH:T})
+.if target(${PATCH})
 ${_BUILD_COOKIE}: ${PATCH_COOKIE}
-	@${ECHO_MSG} "===> Building for ${PATCH:T}"
+	@cd ${.CURDIR} && exec ${MAKE} _check-patchfile PATCH=${PATCH}
+	@${ECHO_MSG} "===> Building for ${PATCH}"
 .  if target(pre-build)
 	@cd ${.CURDIR} && exec ${MAKE} pre-build
 .  endif
-	@cd ${.CURDIR} && exec ${MAKE} ${PATCH:T}
+	@cd ${.CURDIR} && exec ${MAKE} pre-chroot
+	@cd ${.CURDIR} && \
+		${SUDO} exec ${CHROOT} ${WRKDIST} ${KSH} -c \
+		"`cd ${.CURDIR} && ${MAKE} -n ${PATCH}`"
+	@cd ${.CURDIR} && exec ${MAKE} post-chroot
 .  if target(post-build)
 	@cd ${.CURDIR} && exec ${MAKE} post-build
 .  endif
 	@${_MAKE_COOKIE} $@
+.else
+${_BUILD_COOKIE}: ${PATCH_COOKIE}
+	@cd ${.CURDIR} && exec ${MAKE} _check-patchfile PATCH=${PATCH}
+	@${ECHO_MSG} ">> No target with name \"${PATCH}\" has been defined."
+	@${ECHO_MSG}
+	@${ECHO_MSG} ">> Please define this target to instruct obpf how to build"
+	@${ECHO_MSG} ">> the patch changes."
+	@${ECHO_MSG}
+	@exit 1
 .endif
 
+
+KERNEL = GENERIC
 
 #####################################################
 # Cleaning up
@@ -507,17 +527,36 @@ peek-ftp:
 		echo "Connecting to $$i"; ${FETCH_CMD} $$i ; break; \
 	done
 
-
-list-patchfiles: ${_EXTRACT_COOKIE}
+_internal-list-patches:
 	@${ECHO_MSG} "===> Listing patch files for ${DISTNAME}";
-	@for file in ${PATCHFILES}; do\
+	@for file in ${PATCHES}; do\
 		${ECHO_MSG} "$$file"; \
 	done
 
+list-patches: ${_CONFIGURE_COOKIE}
+	@cd ${.CURDIR} && exec ${MAKE} _internal-list-patches
 
-info: _check-patchfile
-	@${ECHO_MSG} "===> Instructions for ${PATCH:T}"
+_internal-info:
+	@${ECHO_MSG} "===> Instructions for ${PATCH}"
 	@numlines=`$(GREP) -n '^Index: ' ${PATCHFILE} | \
 		$(HEAD) -n 1 | $(AWK) -F':' '{print $$1}'`; \
 		$(HEAD) -n `$(ECHO) $$(($$numlines-1))` $(PATCHFILE)
+
+info: ${_CONFIGURE_COOKIE} _check-patchfile
+	@cd ${.CURDIR} && exec ${MAKE} _internal-info PATCH=${PATCH}
+
+
+#####################################################
+# Shortcut build targets
+#####################################################
+m-obj = make obj
+m-cleandir = make cleandir
+m-depend = make depend
+m = make
+m-install = make install
+
+m-kernel:
+	cd /usr/src/sys/arch/${MACHINE}/conf && config ${KERNEL} && \
+	cd /usr/src/sys/arch/${MACHINE}/compile/${KERNEL} && \
+		make clean && make depend && make && chmod 644 ./bsd
 
