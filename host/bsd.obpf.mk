@@ -360,6 +360,8 @@ do-extract-patches:
 			${SUDO} tar xpfz ${DISTDIR}/$$file -C ${PATCHDIST}; \
 			md5 `basename $$file` > ${WRKDIR}/.`basename $$file`.md5; \
 			${ECHO_MSG} "Done."; \
+		else \
+			${ECHO_MSG} "===> Extracted patchset is up to date. No new patches."; \
 		fi; \
 	done
 
@@ -570,10 +572,21 @@ info: ${_CONFIGURE_COOKIE} _check-patchfile
 # Shortcut build targets
 #####################################################
 m-obj = make obj
+m-clean = make clean
 m-cleandir = make cleandir
 m-depend = make depend
+m-includes = make includes
+m-compile = make compile
+m-build = make build
 m = make
 m-install = make install
+
+m-obj-wrp = make -f Makefile.bsd-wrapper obj
+m-cleandir-wrp = make -f Makefile.bsd-wrapper cleandir
+m-depend-wrp = make -f Makefile.bsd-wrapper depend
+m-wrp = make -f Makefile.bsd-wrapper
+m-install-wrp = make -f Makefile.bsd-wrapper install
+
 
 m-kernel:
 	cd /usr/src/sys/arch/${MACHINE}/conf && config ${KERNEL} && \
