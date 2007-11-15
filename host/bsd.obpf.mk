@@ -115,8 +115,7 @@ INSTALL_MAN_DIR = \
 ECHO_MSG ?= ${ECHO}
 
 # Used to fetch any remote file
-FTP_KEEPALIVE ?= 0
-FETCH_CMD ?= ${FTP} -V -m -k ${FTP_KEEPALIVE}
+FETCH_CMD ?= ${FTP} -V -m
 
 CHECKSUM_FILE ?= ${FULLDISTDIR}/${OSREV}/${MACHINE}/MD5
 
