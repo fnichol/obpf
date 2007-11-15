@@ -432,7 +432,7 @@ pre-chroot:
 
 .if !target(do-chroot)
 do-chroot:
-	-@cd ${.CURDIR} && ${SUDO} exec ${CHROOT} ${WRKDIST} ${CHROOT_SHELL}
+	-@cd ${.CURDIR} && exec ${SUDO} ${CHROOT} ${WRKDIST} ${CHROOT_SHELL}
 .endif
 
 .if !target(post-chroot)
@@ -500,7 +500,7 @@ ${_BUILD_COOKIE}: ${_PATCH_COOKIE}
 .  endif
 	@cd ${.CURDIR} && exec ${MAKE} pre-chroot
 	@cd ${.CURDIR} && \
-		${SUDO} exec ${CHROOT} ${WRKDIST} ${KSH} -c \
+		exec ${SUDO} ${CHROOT} ${WRKDIST} ${KSH} -c \
 		"`cd ${.CURDIR} && ${MAKE} -n ${PATCH}`"
 	@cd ${.CURDIR} && exec ${MAKE} post-chroot
 .  if target(post-build)
