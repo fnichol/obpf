@@ -285,8 +285,7 @@ _internal-checksum: _internal-fetch
 		filename=`basename $$file`; \
 		if [ "$$filename" == "${CHECKSUM_FILE:T}" ]; then continue; fi; \
 		if ! ${GREP} "^MD5 ($$filename) = " ${CHECKSUM_FILE} > /dev/null; then \
-			${ECHO_MSG} ">> No checksum recorded for $$file."; \
-			OK=false; \
+			${ECHO_MSG} ">> Warning: No checksum recorded for $$file."; \
 		else \
 			${GREP} "^MD5 ($$filename) = " ${CHECKSUM_FILE} | ${MD5} -c; \
 			if [ "$$?" -ne "0" ]; then \
