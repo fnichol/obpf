@@ -68,6 +68,7 @@ WRKDIR ?= ${.CURDIR}/w-${DISTNAME}
 WRKDIST ?= ${WRKDIR}/${DISTNAME}
 PATCHDIST ?= ${WRKDIR}/patches-${OSREV}
 FAKEDIR ?= ${WRKDIR}/fake-${OSREV}
+PACKAGE_REPOSITORY ?= ${.CURDIR}/packages
 
 
 _WRKDIR_COOKIE = ${WRKDIR}/.extract_started
@@ -127,6 +128,7 @@ PATCH = ${P}
 
 .if defined(PATCH) && exists(${PATCHDIST}/${OSREV}/common) && exists(${PATCHDIST}/${OSREV}/${MACHINE})
 PATCHFILE != ${FIND} ${PATCHDIST} -type f -name ${PATCH}.patch
+_PACKAGE = ${PACKAGE_REPOSITORY}/obpf-${OSREV}-${MACHINE}-${PATCH}.tgz
 .endif
 
 .if defined(verbose-show)
@@ -308,6 +310,7 @@ _internal-patch: ${_PATCH_COOKIE}
 _internal-build: ${_BUILD_COOKIE}
 _internal-plist: ${_PLIST_COOKIE}
 _internal-fake: ${_FAKE_COOKIE}
+_internal-package: ${_PACKAGE}
 
 
 # The real targets. Note that some parts always get run, some parts can be
@@ -442,7 +445,7 @@ post-chroot:
 
 
 # Top-level targets redirect to the real _internal-target
-.for _t in fetch checksum extract configure patch build plist fake \
+.for _t in fetch checksum extract configure patch build plist fake package \
 	chroot clean sync
 ${_t}: _internal-${_t}
 .endfor
@@ -566,6 +569,27 @@ do-fake:
 	@cd ${FAKEDIR}/${PATCH} && ${MD5} ${PATCH}.patch > ${PATCH}.patch.md5
 	@${CP} ${_PLIST_COOKIE} ${FAKEDIR}/${PATCH}/${PATCH}.plist
 	@cd ${FAKEDIR}/${PATCH} && ${MD5} ${PATCH}.plist > ${PATCH}.plist.md5
+.endif
+
+
+#####################################################
+# Packaging
+#####################################################
+${_PACKAGE}: ${_FAKE_COOKIE}
+	@cd ${.CURDIR} && exec ${MAKE} _check-patchfile PATCH=${PATCH}
+	@${ECHO_MSG} "===> Packaging for ${PATCH}"
+.if target(pre-package)
+	@cd ${.CURDIR} && exec ${MAKE} pre-package
+.endif
+	@cd ${.CURDIR} && exec ${MAKE} do-package
+.if target(post-package)
+	@cd ${.CURDIR} && exec ${MAKE} post-package
+.endif
+
+.if !target(do-package)
+do-package:
+	@${MKDIR} -p ${PACKAGE_REPOSITORY}
+	@cd ${FAKEDIR}/ && ${TAR} cpfz ${_PACKAGE} *
 .endif
 
 
