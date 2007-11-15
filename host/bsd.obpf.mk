@@ -120,8 +120,8 @@ CHROOT_SHELL ?= /bin/ksh -li
 PATCH = ${P}
 .endif
 
-.if defined(PATCH)
-PATCHFILE != find ${PATCHDIST} -type f -name ${PATCH}.patch
+.if defined(PATCH) && exists(${PATCHDIST}/${OSREV}/common) && exists(${PATCHDIST}/${OSREV}/${MACHINE})
+PATCHFILE != ${FIND} ${PATCHDIST} -type f -name ${PATCH}.patch
 .endif
 
 .if defined(verbose-show)
@@ -225,14 +225,13 @@ _EVERYTHING = ${DISTFILES}
 _DISTFILES = ${DISTFILES:C/:[0-9]$//}
 ALLFILES = ${_DISTFILES}
 
+.if exists(${PATCHDIST}/${OSREV}/common) && exists(${PATCHDIST}/${OSREV}/${MACHINE})
 _PATCHFILES != \
-	if [ -d "${PATCHDIST}/${OSREV}/common" -a \
-	-d "${PATCHDIST}/${OSREV}/${MACHINE}" ]; then \
 		${FIND} ${PATCHDIST}/${OSREV}/common ${PATCHDIST}/${OSREV}/${MACHINE} \
-		-type f | ${SORT} -t '/' -k 3; \
-	fi
+		-type f | ${SORT} -t '/' -k 3
 PATCHFILES = ${_PATCHFILES:T}
 PATCHES = ${PATCHFILES:C/\.patch$//}
+.endif
 
 
 #####################################################
