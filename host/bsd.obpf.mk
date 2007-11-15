@@ -28,6 +28,7 @@
 #
 AWK = /usr/bin/awk
 BASENAME = /usr/bin/basename
+CAT = /bin/cat
 CHMOD = /bin/chmod
 CHROOT = /usr/sbin/chroot
 CP = /bin/cp
@@ -64,6 +65,7 @@ DISTNAME ?= openbsd-${OSREV}
 WRKDIR ?= ${.CURDIR}/w-${DISTNAME}
 WRKDIST ?= ${WRKDIR}/${DISTNAME}
 PATCHDIST ?= ${WRKDIR}/patches-${OSREV}
+FAKEDIR ?= ${WRKDIR}/fake-${OSREV}
 
 
 _WRKDIR_COOKIE = ${WRKDIR}/.extract_started
@@ -73,6 +75,7 @@ _PRE_PATCH_COOKIE = ${WRKDIR}/.${PATCH}-pre_patch_done
 _PATCH_COOKIE = ${WRKDIR}/.${PATCH}-patch_done
 _BUILD_COOKIE = ${WRKDIR}/.${PATCH}-build_done
 _PLIST_COOKIE = ${WRKDIR}/.${PATCH}.plist
+_FAKE_COOKIE = ${WRKDIR}/.${PATCH}-fake_done
 
 _MAKE_COOKIE = ${TOUCH}
 
@@ -302,6 +305,7 @@ _internal-configure: ${_CONFIGURE_COOKIE}
 _internal-patch: ${_PATCH_COOKIE}
 _internal-build: ${_BUILD_COOKIE}
 _internal-plist: ${_PLIST_COOKIE}
+_internal-fake: ${_FAKE_COOKIE}
 
 
 # The real targets. Note that some parts always get run, some parts can be
@@ -392,10 +396,6 @@ do-configure:
 	@${SUDO} ${MV} ${WRKDIST}/dev ${WRKDIST}/dev.orig
 	@${SUDO} ${INSTALL} -d -m 0755 -o 0 -g 0 ${WRKDIST}/dev
 	@${ECHO_MSG} "Done."
-	@${ECHO_MSG} -n "===> Installing chroot Makefile ... "
-	@${SUDO} ${INSTALL_DATA} ${.CURDIR}/bsd.obpf.chroot.mk ${WRKDIST}
-	@${SUDO} ${INSTALL_DATA} ${.CURDIR}/bsd.obpf.common.mk ${WRKDIST}
-	@${ECHO_MSG} "Done."
 	@${ECHO_MSG} -n "===> Customizing /etc/profile ... "
 	@${ECHO} 'if [ "$$SHELL" == "/bin/ksh" ]; then . /etc/ksh.kshrc; PS1="(obpf):\\W# "; fi' > ${WRKDIST}/etc/profile
 	@${CP} -p ${WRKDIST}/etc/ksh.kshrc ${WRKDIST}/etc/ksh.kshrc.orig; \
@@ -440,7 +440,8 @@ post-chroot:
 
 
 # Top-level targets redirect to the real _internal-target
-.for _t in fetch checksum extract configure patch build plist chroot clean sync
+.for _t in fetch checksum extract configure patch build plist fake \
+	chroot clean sync
 ${_t}: _internal-${_t}
 .endfor
 
@@ -474,7 +475,6 @@ ${_PATCH_COOKIE}: ${_CONFIGURE_COOKIE}
 	@cd ${.CURDIR} && exec ${MAKE} post-patch
 .endif
 	@${_MAKE_COOKIE} $@
-
 
 .if !target(do-patch)
 do-patch:
@@ -535,6 +535,35 @@ do-plist:
 		-newer ${_PRE_PATCH_COOKIE} -a ! -newer ${_BUILD_COOKIE} -type f | \
 		${SED} 's,^${WRKDIST},.,' | \
 		${GREP} -v '/usr/src' | ${GREP} -v '/usr/obj'	> ${_PLIST_COOKIE}
+.endif
+
+
+#####################################################
+# Faking package creation (preparing bits for packaging)
+#####################################################
+${_FAKE_COOKIE}: ${_PLIST_COOKIE}
+	@cd ${.CURDIR} && exec ${MAKE} _check-patchfile PATCH=${PATCH}
+	@${ECHO_MSG} "===> Faking package creation for ${PATCH}"
+.if target(pre-fake)
+	@cd ${.CURDIR} && exec ${MAKE} pre-fake
+.endif
+	@cd ${.CURDIR} && exec ${MAKE} do-fake
+.if target(post-fake)
+	@cd ${.CURDIR} && exec ${MAKE} post-fake
+.endif
+	@${_MAKE_COOKIE} $@
+
+.if !target(do-fake)
+do-fake:
+	@mkdir -p ${FAKEDIR}/${PATCH}
+	@cd ${WRKDIST} && \
+		${CAT} ${_PLIST_COOKIE} | ${XARGS} ${TAR} cpfz ${FAKEDIR}/${PATCH}/pack.tgz
+	@cd ${FAKEDIR}/${PATCH} && ${MD5} pack.tgz > pack.tgz.md5
+	@${FIND} ${PATCHDIST} -type f -name ${PATCH}.patch \
+		-exec ${CP} {} ${FAKEDIR}/${PATCH} \;
+	@cd ${FAKEDIR}/${PATCH} && ${MD5} ${PATCH}.patch > ${PATCH}.patch.md5
+	@${CP} ${_PLIST_COOKIE} ${FAKEDIR}/${PATCH}/${PATCH}.plist
+	@cd ${FAKEDIR}/${PATCH} && ${MD5} ${PATCH}.plist > ${PATCH}.plist.md5
 .endif
 
 
