@@ -589,7 +589,7 @@ ${_PACKAGE}: ${_FAKE_COOKIE}
 .if !target(do-package)
 do-package:
 	@${MKDIR} -p ${PACKAGE_REPOSITORY}
-	@cd ${FAKEDIR}/ && ${TAR} cpfz ${_PACKAGE} *
+	@cd ${FAKEDIR}/ && ${TAR} cpfz ${_PACKAGE} ${PATCH}
 .endif
 
 
