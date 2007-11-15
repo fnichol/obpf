@@ -658,6 +658,7 @@ m-compile = make compile
 m-build = make build
 m = make
 m-install = make install
+m-std = ${m-obj} && ${m-cleandir} && ${m-depend} && ${m} && ${m-install}
 
 m-obj-wrp = make -f Makefile.bsd-wrapper obj
 m-cleandir-wrp = make -f Makefile.bsd-wrapper cleandir
