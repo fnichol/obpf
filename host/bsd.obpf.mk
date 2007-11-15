@@ -46,8 +46,10 @@ MKDIR = /bin/mkdir
 MOUNT_MFS = /sbin/mount_mfs
 MV = /bin/mv
 PATCH_CMD = /usr/bin/patch
+RM = /bin/rm
 SED = /usr/bin/sed
 SORT = /usr/bin/sort
+SUDO = /usr/bin/sudo
 TAR = /bin/tar
 TOUCH = /usr/bin/touch
 UMOUNT = /sbin/umount
@@ -117,7 +119,7 @@ FETCH_CMD ?= ${FTP} -V -m -k ${FTP_KEEPALIVE}
 
 CHECKSUM_FILE ?= ${FULLDISTDIR}/${OSREV}/${MACHINE}/MD5
 
-CHROOT_SHELL ?= /bin/ksh -li
+CHROOT_SHELL ?= ${KSH} -li
 
 .if defined(P)
 PATCH = ${P}
@@ -258,7 +260,7 @@ _internal-fetch:
 # Seperate target for each file fetch will retrieve
 .for _F in ${ALLFILES:S@^@${FULLDISTDIR}/@}
 ${_F}:
-	@mkdir -p ${_F:H}; \
+	@${MKDIR} -p ${_F:H}; \
 	cd ${_F:H}; \
 	select=${_EVERYTHING:M*${_F:S@^${FULLDISTDIR}/@@}\:[0-9]}; \
 	f=${_F:S@^${FULLDISTDIR}/@@}; \
@@ -281,11 +283,11 @@ _internal-checksum: _internal-fetch
 	for file in ${_DISTFILES_OS}; do \
 		filename=`basename $$file`; \
 		if [ "$$filename" == "${CHECKSUM_FILE:T}" ]; then continue; fi; \
-		if ! grep "^MD5 ($$filename) = " ${CHECKSUM_FILE} > /dev/null; then \
+		if ! ${GREP} "^MD5 ($$filename) = " ${CHECKSUM_FILE} > /dev/null; then \
 			${ECHO_MSG} ">> No checksum recorded for $$file."; \
 			OK=false; \
 		else \
-			grep "^MD5 ($$filename) = " ${CHECKSUM_FILE} | md5 -c; \
+			${GREP} "^MD5 ($$filename) = " ${CHECKSUM_FILE} | ${MD5} -c; \
 			if [ "$$?" -ne "0" ]; then \
 				echo ">> Checksum mismatch for $$file."; \
 				OK=false; \
@@ -315,8 +317,8 @@ _internal-fake: ${_FAKE_COOKIE}
 # System extraction
 #####################################################
 ${_WRKDIR_COOKIE}:
-	@rm -rf ${WRKDIR}
-	@mkdir -p ${WRKDIR}
+	@${RM} -rf ${WRKDIR}
+	@${MKDIR} -p ${WRKDIR}
 	@${_MAKE_COOKIE} $@
 
 ${_EXTRACT_COOKIE}: ${_WRKDIR_COOKIE}
@@ -333,16 +335,16 @@ ${_EXTRACT_COOKIE}: ${_WRKDIR_COOKIE}
 
 .if !target(do-extract)
 do-extract:
-	@mkdir -p ${WRKDIST}
+	@${MKDIR} -p ${WRKDIST}
 	@for file in ${_DISTFILES_OS:C/:[0-9]$//}; do \
 		if [ "`basename $$file`" == "${CHECKSUM_FILE:T}" ]; then continue; fi; \
 		${ECHO_MSG} -n "===> Extracting `basename $$file` ... "; \
-		${SUDO} tar xpfz ${DISTDIR}/$$file -C ${WRKDIST}; \
+		${SUDO} ${TAR} xpfz ${DISTDIR}/$$file -C ${WRKDIST}; \
 		${ECHO_MSG} "Done."; \
 	done
 	@for file in ${_DISTFILES_SRC:C/:[0-9]$//}; do \
 		${ECHO_MSG} -n "===> Extracting `basename $$file` ... "; \
-		${SUDO} tar xpfz ${DISTDIR}/$$file -C ${WRKDIST}/usr/src; \
+		${SUDO} ${TAR} xpfz ${DISTDIR}/$$file -C ${WRKDIST}/usr/src; \
 		${ECHO_MSG} "Done."; \
 	done
 	@for file in ${KERNELCONFS:C/:[0-9]$//}; do \
@@ -355,13 +357,13 @@ do-extract:
 .endif
 
 do-extract-patches:
-	@mkdir -p ${PATCHDIST}
+	@${MKDIR} -p ${PATCHDIST}
 	@for file in ${_DISTFILES_PATCHSET:C/:[0-9]$//}; do \
 		cd ${DISTDIR}/`dirname $$file` && \
 		if ! ${MD5} -c ${WRKDIR}/.`basename $$file`.md5 > /dev/null 2>&1; then \
 			${ECHO_MSG} -n "===> Extracting patchset for `basename $$file` ... "; \
-			${SUDO} tar xpfz ${DISTDIR}/$$file -C ${PATCHDIST}; \
-			md5 `basename $$file` > ${WRKDIR}/.`basename $$file`.md5; \
+			${SUDO} ${TAR} xpfz ${DISTDIR}/$$file -C ${PATCHDIST}; \
+			${MD5} `basename $$file` > ${WRKDIR}/.`basename $$file`.md5; \
 			${ECHO_MSG} "Done."; \
 		else \
 			${ECHO_MSG} "===> Extracted patchset is up to date. No new patches."; \
@@ -369,7 +371,7 @@ do-extract-patches:
 	done
 
 _internal-sync:
-	@rm -f ${DISTDIR}/${_DISTFILES_PATCHSET}
+	@${RM} -f ${DISTDIR}/${_DISTFILES_PATCHSET}
 	@cd ${.CURDIR} && \
 	exec ${MAKE} ${_DISTFILES_PATCHSET:C/:[0-9]$//:S@^@${FULLDISTDIR}/@}
 	@cd ${.CURDIR} && exec ${MAKE} do-extract-patches
@@ -399,8 +401,8 @@ do-configure:
 	@${ECHO_MSG} -n "===> Customizing /etc/profile ... "
 	@${ECHO} 'if [ "$$SHELL" == "/bin/ksh" ]; then . /etc/ksh.kshrc; PS1="(obpf):\\W# "; fi' > ${WRKDIST}/etc/profile
 	@${CP} -p ${WRKDIST}/etc/ksh.kshrc ${WRKDIST}/etc/ksh.kshrc.orig; \
-	grep -v 'tty=`basename $$tty`$$' ${WRKDIST}/etc/ksh.kshrc.orig > \
-	${WRKDIST}/etc/ksh.kshrc && rm ${WRKDIST}/etc/ksh.kshrc.orig
+		${GREP} -v 'tty=`basename $$tty`$$' ${WRKDIST}/etc/ksh.kshrc.orig > \
+		${WRKDIST}/etc/ksh.kshrc && ${RM} ${WRKDIST}/etc/ksh.kshrc.orig
 	@${ECHO_MSG} "Done."
 .endif
 
@@ -555,7 +557,7 @@ ${_FAKE_COOKIE}: ${_PLIST_COOKIE}
 
 .if !target(do-fake)
 do-fake:
-	@mkdir -p ${FAKEDIR}/${PATCH}
+	@${MKDIR} -p ${FAKEDIR}/${PATCH}
 	@cd ${WRKDIST} && \
 		${CAT} ${_PLIST_COOKIE} | ${XARGS} ${TAR} cpfz ${FAKEDIR}/${PATCH}/pack.tgz
 	@cd ${FAKEDIR}/${PATCH} && ${MD5} pack.tgz > pack.tgz.md5
@@ -577,15 +579,15 @@ KERNEL ?= GENERIC
 _internal-clean:
 	@${ECHO_MSG} "===>  Cleaning"
 .if ${_clean:L:Mwork}
-	@if [ -L ${WRKDIR} ]; then rm -rf `readlink ${WRKDIR}`; fi
-	@rm -rf ${WRKDIR}
+	@if [ -L ${WRKDIR} ]; then ${RM} -rf `readlink ${WRKDIR}`; fi
+	@${RM} -rf ${WRKDIR}
 .endif
 .if ${_clean:L:Mdist}
 	@${ECHO_MSG} "===>  Dist cleaning"
 	@if cd ${DISTDIR} 2>/dev/null; then \
-		rm -f ${ALLFILES}; \
+		${RM} -f ${ALLFILES}; \
 	fi
-	@rm -rf ${FULLDISTDIR}
+	@${RM} -rf ${FULLDISTDIR}
 .endif
 
 
@@ -598,7 +600,7 @@ distclean:
 
 
 peek-ftp:
-	@mkdir -p ${FULLDISTDIR}; cd ${FULLDISTDIR}; echo "cd ${FULLDISTDIR}"; \
+	@${MKDIR} -p ${FULLDISTDIR}; cd ${FULLDISTDIR}; echo "cd ${FULLDISTDIR}"; \
 	for i in ${MASTER_SITES:Mftp*}; do \
 		echo "Connecting to $$i"; ${FETCH_CMD} $$i ; break; \
 	done
@@ -614,9 +616,9 @@ list-patches: ${_CONFIGURE_COOKIE}
 
 _internal-info:
 	@${ECHO_MSG} "===> Instructions for ${PATCH}"
-	@numlines=`$(GREP) -n '^Index: ' ${PATCHFILE} | \
-		$(HEAD) -n 1 | $(AWK) -F':' '{print $$1}'`; \
-		$(HEAD) -n `$(ECHO) $$(($$numlines-1))` $(PATCHFILE)
+	@numlines=`${GREP} -n '^Index: ' ${PATCHFILE} | \
+		${HEAD} -n 1 | ${AWK} -F':' '{print $$1}'`; \
+		${HEAD} -n `${ECHO} $$(($$numlines-1))` ${PATCHFILE}
 
 info: ${_CONFIGURE_COOKIE} _check-patchfile
 	@cd ${.CURDIR} && exec ${MAKE} _internal-info PATCH=${PATCH}
@@ -640,7 +642,6 @@ m-cleandir-wrp = make -f Makefile.bsd-wrapper cleandir
 m-depend-wrp = make -f Makefile.bsd-wrapper depend
 m-wrp = make -f Makefile.bsd-wrapper
 m-install-wrp = make -f Makefile.bsd-wrapper install
-
 
 m-kernel:
 	cd /usr/src/sys/arch/${MACHINE}/conf && config ${KERNEL} && \
