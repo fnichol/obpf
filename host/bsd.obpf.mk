@@ -79,6 +79,8 @@ _PATCH_COOKIE = ${WRKDIR}/.${PATCH}-patch_done
 _BUILD_COOKIE = ${WRKDIR}/.${PATCH}-build_done
 _PLIST_COOKIE = ${WRKDIR}/.${PATCH}.plist
 _FAKE_COOKIE = ${WRKDIR}/.${PATCH}-fake_done
+_CHROOT_KERNEL_COOKIE = /usr/src/.${PATCH}.iskernel
+_KERNEL_COOKIE = ${DISTNAME}${_CHROOT_KERNEL_COOKIE}
 
 _MAKE_COOKIE = ${TOUCH}
 
@@ -473,7 +475,11 @@ ${_PATCH_COOKIE}: ${_CONFIGURE_COOKIE}
 .if target(pre-patch)
 	@cd ${.CURDIR} && exec ${MAKE} pre-patch
 .endif
+.if target(${PATCH}-do-patch)
+	@cd ${.CURDIR} && exec ${MAKE} ${PATCH}-do-patch
+.else
 	@cd ${.CURDIR} && exec ${MAKE} do-patch
+.endif
 .if target(post-patch)
 	@cd ${.CURDIR} && exec ${MAKE} post-patch
 .endif
@@ -526,7 +532,11 @@ ${_PLIST_COOKIE}: ${_BUILD_COOKIE}
 .if target(pre-plist)
 	@cd ${.CURDIR} && exec ${MAKE} pre-plist
 .endif
+.if target(${PATCH}-do-plist)
+	@cd ${.CURDIR} && exec ${MAKE} ${PATCH}-do-plist
+.else
 	@cd ${.CURDIR} && exec ${MAKE} do-plist
+.endif
 .if target(post-plist)
 	@cd ${.CURDIR} && exec ${MAKE} post-plist
 .endif
@@ -550,7 +560,11 @@ ${_FAKE_COOKIE}: ${_PLIST_COOKIE}
 .if target(pre-fake)
 	@cd ${.CURDIR} && exec ${MAKE} pre-fake
 .endif
+.if target(${PATCH}-do-fake)
+	@cd ${.CURDIR} && exec ${MAKE} ${PATCH}-do-fake
+.else
 	@cd ${.CURDIR} && exec ${MAKE} do-fake
+.endif
 .if target(post-fake)
 	@cd ${.CURDIR} && exec ${MAKE} post-fake
 .endif
@@ -579,7 +593,11 @@ ${_PACKAGE}: ${_FAKE_COOKIE}
 .if target(pre-package)
 	@cd ${.CURDIR} && exec ${MAKE} pre-package
 .endif
+.if target(${PATCH}-do-package)
+	@cd ${.CURDIR} && exec ${MAKE} ${PATCH}-do-package
+.else
 	@cd ${.CURDIR} && exec ${MAKE} do-package
+.endif
 .if target(post-package)
 	@cd ${.CURDIR} && exec ${MAKE} post-package
 .endif
@@ -673,5 +691,6 @@ m-install-wrp = make -f Makefile.bsd-wrapper install
 m-kernel:
 	cd /usr/src/sys/arch/${MACHINE}/conf && config ${KERNEL} && \
 	cd /usr/src/sys/arch/${MACHINE}/compile/${KERNEL} && \
-		make clean && make depend && make && chmod 644 ./bsd
+	make clean && make depend && make && chmod 644 ./bsd && \
+	${_MAKE_COOKIE} ${_CHROOT_KERNEL_COOKIE}
 
