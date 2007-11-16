@@ -130,9 +130,12 @@ CHROOT_ENV ?= cd ${.CURDIR} && exec ${SUDO} ${CHROOT} ${WRKDIST}
 PATCH = ${P}
 .endif
 
-.if defined(PATCH) && exists(${PATCHDIST}/${OSREV}/common) && exists(${PATCHDIST}/${OSREV}/${MACHINE})
+.if defined(PATCH) 
+.  if exists(${PATCHDIST}/${OSREV}/common/${PATCH}.patch) || exists(${PATCHDIST}/${OSREV}/${MACHINE}/${PATCH}.patch)
 PATCHFILE != ${FIND} ${PATCHDIST} -type f -name ${PATCH}.patch
 _PACKAGE = ${PACKAGE_REPOSITORY}/obpf-${OSREV}-${MACHINE}-${PATCH}.tgz
+_IS_KERNEL = `if [ "\`cd ${.CURDIR} && exec ${MAKE} -n ${PATCH}\`" == "echo iskernel" ]; then echo true; else echo false; fi`
+.  endif
 .endif
 
 .if defined(verbose-show)
@@ -698,7 +701,9 @@ m-depend-wrp = make -f Makefile.bsd-wrapper depend
 m-wrp = make -f Makefile.bsd-wrapper
 m-install-wrp = make -f Makefile.bsd-wrapper install
 
-m-kernel:
+m-kernel = echo iskernel
+
+_real-kernel:
 	cd /usr/src/sys/arch/${MACHINE}/conf && config ${KERNEL} && \
 	cd /usr/src/sys/arch/${MACHINE}/compile/${KERNEL} && \
 	make clean && make depend && make && chmod 644 ./bsd && \
