@@ -70,17 +70,44 @@ PATCHDIST ?= ${WRKDIR}/patches-${OSREV}
 FAKEDIR ?= ${WRKDIR}/fake-${OSREV}
 PACKAGE_REPOSITORY ?= ${.CURDIR}/packages
 
+KERNEL ?= GENERIC
+
+.if defined(P)
+PATCH = ${P}
+.endif
+
+.if defined(PATCH) 
+.  if exists(${PATCHDIST}/${OSREV}/common/${PATCH}.patch) || exists(${PATCHDIST}/${OSREV}/${MACHINE}/${PATCH}.patch)
+PATCHFILE != ${FIND} ${PATCHDIST} -type f -name ${PATCH}.patch
+_PACKAGE = ${PACKAGE_REPOSITORY}/obpf-${OSREV}-${MACHINE}-${PATCH}.tgz
+#_IS_KERNEL != if [ "" == "echo iskernel" ]; then echo true; else echo false; fi
+_IS_KERNEL = "wow"
+.  else
+_IS_KERNEL = "unknown"
+.  endif
+.else
+_IS_KERNEL = "unknown"
+.endif
+
+.if exists(${WRKDIST}/usr/src/sys/arch/${MACHINE}/conf)
+KERNELFILE != ${FIND} ${WRKDIST}/usr/src/sys/arch/${MACHINE}/conf \
+	-type f -name ${KERNEL}
+.endif
 
 _WRKDIR_COOKIE = ${WRKDIR}/.extract_started
 _EXTRACT_COOKIE = ${WRKDIR}/.extract_done
 _CONFIGURE_COOKIE = ${WRKDIR}/.configure_done
 _PRE_PATCH_COOKIE = ${WRKDIR}/.${PATCH}-pre_patch_done
 _PATCH_COOKIE = ${WRKDIR}/.${PATCH}-patch_done
+.if ${_IS_KERNEL} == "true"
+_BUILD_COOKIE = ${WRKDIR}/.${PATCH}-${KERNEL}-build_done
+_PLIST_COOKIE = ${WRKDIR}/.${PATCH}-${KERNEL}.plist
+_FAKE_COOKIE = ${WRKDIR}/.${PATCH}-${KERNEL}-fake_done
+.else
 _BUILD_COOKIE = ${WRKDIR}/.${PATCH}-build_done
 _PLIST_COOKIE = ${WRKDIR}/.${PATCH}.plist
 _FAKE_COOKIE = ${WRKDIR}/.${PATCH}-fake_done
-_CHROOT_KERNEL_COOKIE = /usr/src/.${PATCH}.iskernel
-_KERNEL_COOKIE = ${DISTNAME}${_CHROOT_KERNEL_COOKIE}
+.endif
 
 _MAKE_COOKIE = ${TOUCH}
 
@@ -124,19 +151,6 @@ CHECKSUM_FILE ?= ${FULLDISTDIR}/${OSREV}/${MACHINE}/MD5
 CHROOT_SHELL ?= ${KSH} -li
 
 CHROOT_ENV ?= cd ${.CURDIR} && exec ${SUDO} ${CHROOT} ${WRKDIST}
-
-
-.if defined(P)
-PATCH = ${P}
-.endif
-
-.if defined(PATCH) 
-.  if exists(${PATCHDIST}/${OSREV}/common/${PATCH}.patch) || exists(${PATCHDIST}/${OSREV}/${MACHINE}/${PATCH}.patch)
-PATCHFILE != ${FIND} ${PATCHDIST} -type f -name ${PATCH}.patch
-_PACKAGE = ${PACKAGE_REPOSITORY}/obpf-${OSREV}-${MACHINE}-${PATCH}.tgz
-_IS_KERNEL = `if [ "\`cd ${.CURDIR} && exec ${MAKE} -n ${PATCH}\`" == "echo iskernel" ]; then echo true; else echo false; fi`
-.  endif
-.endif
 
 .if defined(verbose-show)
 .MAIN: verbose-show
@@ -472,6 +486,21 @@ _check-patchfile:
 .endif
 
 
+_check-kernelfile:
+.if !defined(KERNEL)
+	@${ECHO_MSG}
+	@${ECHO_MSG} ">> Variable KERNEL (or K) not defined!"
+	@${ECHO_MSG} ">> usage: make KERNEL=<kernelconf> <action>"
+.else
+	@if [ ! -e "${KERNELFILE}" ]; then \
+		${ECHO_MSG} ">> A kernel config with name \"${KERNEL}\" could not be found."; \
+		${ECHO_MSG} ">> To list all kernel configs, run: make list-kernels"; \
+		${ECHO_MSG}; \
+		exit 1; \
+	fi
+.endif
+
+
 #####################################################
 # Patching
 #####################################################
@@ -504,12 +533,22 @@ do-patch:
 .if target(${PATCH})
 ${_BUILD_COOKIE}: ${_PATCH_COOKIE}
 	@cd ${.CURDIR} && exec ${MAKE} _check-patchfile PATCH=${PATCH}
+.if ${_IS_KERNEL} == "true"
+	@cd ${.CURDIR} && exec ${MAKE} _check-kernelfile KERNEL=${KERNEL}
+.endif
 	@${ECHO_MSG} "===> Building for ${PATCH}"
 .  if target(pre-build)
 	@cd ${.CURDIR} && exec ${MAKE} pre-build
 .  endif
 	@cd ${.CURDIR} && exec ${MAKE} pre-chroot
+.if ${_IS_KERNEL} == "true"
+	@${CHROOT_ENV} ${KSH} -c "\
+		cd /usr/src/sys/arch/${MACHINE}/conf && config ${KERNEL} && \
+		cd /usr/src/sys/arch/${MACHINE}/compile/${KERNEL} && \
+		make clean && make depend && make && chmod 644 ./bsd"
+.else
 	@${CHROOT_ENV} ${KSH} -c "`cd ${.CURDIR} && ${MAKE} -n ${PATCH}`"
+.endif
 	@cd ${.CURDIR} && exec ${MAKE} post-chroot
 .  if target(post-build)
 	@cd ${.CURDIR} && exec ${MAKE} post-build
@@ -613,10 +652,6 @@ do-package:
 .endif
 
 
-
-
-KERNEL ?= GENERIC
-
 #####################################################
 # Cleaning up
 #####################################################
@@ -706,6 +741,5 @@ m-kernel = echo iskernel
 _real-kernel:
 	cd /usr/src/sys/arch/${MACHINE}/conf && config ${KERNEL} && \
 	cd /usr/src/sys/arch/${MACHINE}/compile/${KERNEL} && \
-	make clean && make depend && make && chmod 644 ./bsd && \
-	${_MAKE_COOKIE} ${_CHROOT_KERNEL_COOKIE}
+	make clean && make depend && make && chmod 644 ./bsd
 
