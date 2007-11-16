@@ -80,8 +80,9 @@ PATCH = ${P}
 .  if exists(${PATCHDIST}/${OSREV}/common/${PATCH}.patch) || exists(${PATCHDIST}/${OSREV}/${MACHINE}/${PATCH}.patch)
 PATCHFILE != ${FIND} ${PATCHDIST} -type f -name ${PATCH}.patch
 _PACKAGE = ${PACKAGE_REPOSITORY}/obpf-${OSREV}-${MACHINE}-${PATCH}.tgz
-#_IS_KERNEL != if [ "" == "echo iskernel" ]; then echo true; else echo false; fi
-_IS_KERNEL = "wow"
+_PRE_IS_KERNEL != grep '^m-kernel =' bsd.obpf.mk | cat - Makefile | \
+	grep -v '^include' | ${MAKE} -n -f - ${PATCH}
+_IS_KERNEL != if [ "${_PRE_IS_KERNEL}" == "echo iskernel" ]; then echo true; else echo false; fi
 .  else
 _IS_KERNEL = "unknown"
 .  endif
