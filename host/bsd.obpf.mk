@@ -123,6 +123,9 @@ CHECKSUM_FILE ?= ${FULLDISTDIR}/${OSREV}/${MACHINE}/MD5
 
 CHROOT_SHELL ?= ${KSH} -li
 
+CHROOT_ENV ?= cd ${.CURDIR} && exec ${SUDO} ${CHROOT} ${WRKDIST}
+
+
 .if defined(P)
 PATCH = ${P}
 .endif
@@ -432,7 +435,8 @@ pre-chroot:
 
 .if !target(do-chroot)
 do-chroot:
-	-@cd ${.CURDIR} && exec ${SUDO} ${CHROOT} ${WRKDIST} ${CHROOT_SHELL}
+#	-@cd ${.CURDIR} && exec ${SUDO} ${CHROOT} ${WRKDIST} ${CHROOT_SHELL}
+	-${CHROOT_ENV} ${CHROOT_SHELL}
 .endif
 
 .if !target(post-chroot)
