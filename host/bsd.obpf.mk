@@ -659,6 +659,15 @@ _internal-list-patches:
 list-patches: ${_CONFIGURE_COOKIE}
 	@cd ${.CURDIR} && exec ${MAKE} _internal-list-patches
 
+_internal-list-kernels:
+	@${ECHO_MSG} "===> Listing kernel configurations for ${DISTNAME}";
+	@cd ${WRKDIST}/usr/src/sys/arch/${MACHINE}/conf && \
+		${LS} -1 | ${EGREP} -v "^(CVS|Makefile.${MACHINE}|files.${MACHINE})$$" | \
+		${SORT}
+
+list-kernels: ${_CONFIGURE_COOKIE}
+	@cd ${.CURDIR} && exec ${MAKE} _internal-list-kernels
+
 _internal-info:
 	@${ECHO_MSG} "===> Instructions for ${PATCH}"
 	@numlines=`${GREP} -n '^Index: ' ${PATCHFILE} | \
