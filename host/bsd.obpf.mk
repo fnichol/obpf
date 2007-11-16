@@ -621,6 +621,10 @@ distclean:
 	@cd ${.CURDIR} && exec ${MAKE} clean=dist
 
 
+bootstrap:
+	@cd ${.CURDIR} && exec ${MAKE} configure
+
+
 peek-ftp:
 	@${MKDIR} -p ${FULLDISTDIR}; cd ${FULLDISTDIR}; echo "cd ${FULLDISTDIR}"; \
 	for i in ${MASTER_SITES:Mftp*}; do \
