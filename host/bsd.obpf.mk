@@ -95,20 +95,22 @@ KERNELFILE != ${FIND} ${WRKDIST}/usr/src/sys/arch/${MACHINE}/conf \
 	-type f -name ${KERNEL}
 .endif
 
+
+.if ${_IS_KERNEL} == "true"
+PATCH_DISP = ${PATCH}-${KERNEL}
+.else
+PATCH_DISP = ${PATCH}
+.endif
+
+
 _WRKDIR_COOKIE = ${WRKDIR}/.extract_started
 _EXTRACT_COOKIE = ${WRKDIR}/.extract_done
 _CONFIGURE_COOKIE = ${WRKDIR}/.configure_done
 _PRE_PATCH_COOKIE = ${WRKDIR}/.${PATCH}-pre_patch_done
 _PATCH_COOKIE = ${WRKDIR}/.${PATCH}-patch_done
-.if ${_IS_KERNEL} == "true"
-_BUILD_COOKIE = ${WRKDIR}/.${PATCH}-${KERNEL}-build_done
-_PLIST_COOKIE = ${WRKDIR}/.${PATCH}-${KERNEL}.plist
-_FAKE_COOKIE = ${WRKDIR}/.${PATCH}-${KERNEL}-fake_done
-.else
-_BUILD_COOKIE = ${WRKDIR}/.${PATCH}-build_done
-_PLIST_COOKIE = ${WRKDIR}/.${PATCH}.plist
-_FAKE_COOKIE = ${WRKDIR}/.${PATCH}-fake_done
-.endif
+_BUILD_COOKIE = ${WRKDIR}/.${PATCH_DISP}-build_done
+_PLIST_COOKIE = ${WRKDIR}/.${PATCH_DISP}.plist
+_FAKE_COOKIE = ${WRKDIR}/.${PATCH_DISP}-fake_done
 
 _MAKE_COOKIE = ${TOUCH}
 
@@ -537,7 +539,7 @@ ${_BUILD_COOKIE}: ${_PATCH_COOKIE}
 .if ${_IS_KERNEL} == "true"
 	@cd ${.CURDIR} && exec ${MAKE} _check-kernelfile KERNEL=${KERNEL}
 .endif
-	@${ECHO_MSG} "===> Building for ${PATCH}"
+	@${ECHO_MSG} "===> Building for ${PATCH_DISP}"
 .  if target(pre-build)
 	@cd ${.CURDIR} && exec ${MAKE} pre-build
 .  endif
@@ -572,7 +574,7 @@ ${_BUILD_COOKIE}: ${_PATCH_COOKIE}
 #####################################################
 ${_PLIST_COOKIE}: ${_BUILD_COOKIE}
 	@cd ${.CURDIR} && exec ${MAKE} _check-patchfile PATCH=${PATCH}
-	@${ECHO_MSG} "===> Building plist for ${PATCH}"
+	@${ECHO_MSG} "===> Building plist for ${PATCH_DISP}"
 .if target(pre-plist)
 	@cd ${.CURDIR} && exec ${MAKE} pre-plist
 .endif
@@ -587,11 +589,15 @@ ${_PLIST_COOKIE}: ${_BUILD_COOKIE}
 
 .if !target(do-plist)
 do-plist:
+.  if ${_IS_KERNEL} == "true"
+	@${ECHO} "./bsd" > ${_PLIST_COOKIE}
+.  else
 	@${FIND} ${WRKDIST} -path ${WRKDIST}/usr/src -prune -or \
 		-path ${WRKDIST}/usr/obj -prune -or \
 		-newer ${_PRE_PATCH_COOKIE} -a ! -newer ${_BUILD_COOKIE} -type f | \
 		${SED} 's,^${WRKDIST},.,' | \
 		${GREP} -v '/usr/src' | ${GREP} -v '/usr/obj'	> ${_PLIST_COOKIE}
+.  endif
 .endif
 
 
@@ -600,7 +606,7 @@ do-plist:
 #####################################################
 ${_FAKE_COOKIE}: ${_PLIST_COOKIE}
 	@cd ${.CURDIR} && exec ${MAKE} _check-patchfile PATCH=${PATCH}
-	@${ECHO_MSG} "===> Faking package creation for ${PATCH}"
+	@${ECHO_MSG} "===> Faking package creation for ${PATCH_DISP}"
 .if target(pre-fake)
 	@cd ${.CURDIR} && exec ${MAKE} pre-fake
 .endif
@@ -616,15 +622,20 @@ ${_FAKE_COOKIE}: ${_PLIST_COOKIE}
 
 .if !target(do-fake)
 do-fake:
-	@${MKDIR} -p ${FAKEDIR}/${PATCH}
-	@cd ${WRKDIST} && \
-		${CAT} ${_PLIST_COOKIE} | ${XARGS} ${TAR} cpfz ${FAKEDIR}/${PATCH}/pack.tgz
-	@cd ${FAKEDIR}/${PATCH} && ${MD5} pack.tgz > pack.tgz.md5
+	@${MKDIR} -p ${FAKEDIR}/${PATCH_DISP}
+.  if ${_IS_KERNEL} == "true"
+	@cd ${WRKDIST}/usr/src/sys/arch/${MACHINE}/compile/${KERNEL} && \
+		${TAR} cpfz ${FAKEDIR}/${PATCH_DISP}/pack.tgz ./bsd
+.  else
+	@cd ${WRKDIST} && ${CAT} ${_PLIST_COOKIE} | \
+		${XARGS} ${TAR} cpfz ${FAKEDIR}/${PATCH_DISP}/pack.tgz
+.  endif
+	@cd ${FAKEDIR}/${PATCH_DISP} && ${MD5} pack.tgz > pack.tgz.md5
 	@${FIND} ${PATCHDIST} -type f -name ${PATCH}.patch \
-		-exec ${CP} {} ${FAKEDIR}/${PATCH} \;
-	@cd ${FAKEDIR}/${PATCH} && ${MD5} ${PATCH}.patch > ${PATCH}.patch.md5
-	@${CP} ${_PLIST_COOKIE} ${FAKEDIR}/${PATCH}/${PATCH}.plist
-	@cd ${FAKEDIR}/${PATCH} && ${MD5} ${PATCH}.plist > ${PATCH}.plist.md5
+		-exec ${CP} {} ${FAKEDIR}/${PATCH_DISP} \;
+	@cd ${FAKEDIR}/${PATCH_DISP} && ${MD5} ${PATCH}.patch > ${PATCH}.patch.md5
+	@${CP} ${_PLIST_COOKIE} ${FAKEDIR}/${PATCH_DISP}/${PATCH}.plist
+	@cd ${FAKEDIR}/${PATCH_DISP} && ${MD5} ${PATCH}.plist > ${PATCH}.plist.md5
 .endif
 
 
@@ -633,7 +644,7 @@ do-fake:
 #####################################################
 ${_PACKAGE}: ${_FAKE_COOKIE}
 	@cd ${.CURDIR} && exec ${MAKE} _check-patchfile PATCH=${PATCH}
-	@${ECHO_MSG} "===> Packaging for ${PATCH}"
+	@${ECHO_MSG} "===> Packaging for ${PATCH_DISP}"
 .if target(pre-package)
 	@cd ${.CURDIR} && exec ${MAKE} pre-package
 .endif
@@ -649,7 +660,7 @@ ${_PACKAGE}: ${_FAKE_COOKIE}
 .if !target(do-package)
 do-package:
 	@${MKDIR} -p ${PACKAGE_REPOSITORY}
-	@cd ${FAKEDIR}/ && ${TAR} cpfz ${_PACKAGE} ${PATCH}
+	@cd ${FAKEDIR}/ && ${TAR} cpfz ${_PACKAGE} ${PATCH_DISP}
 .endif
 
 
