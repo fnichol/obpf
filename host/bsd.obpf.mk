@@ -338,14 +338,40 @@ _internal-checksum: _internal-fetch
 _internal-extract: ${_EXTRACT_COOKIE}
 _internal-configure: ${_CONFIGURE_COOKIE}
 _internal-patch: ${_PATCH_COOKIE}
+
+# If KERNELS is defined, then this will run these targets for each kernel
+.if ${_IS_KERNEL} == "true" && defined(KERNELS) && !defined(_KERNELS_RECURS)
+_internal-build:
+.  for _kernel in ${KERNELS}
+	@cd ${.CURDIR} && \
+		exec ${MAKE} build PATCH=${PATCH} KERNEL=${_kernel} _KERNELS_RECURS=true
+.  endfor
+
+_internal-plist:
+.  for _kernel in ${KERNELS}
+	@cd ${.CURDIR} && \
+		exec ${MAKE} plist PATCH=${PATCH} KERNEL=${_kernel} _KERNELS_RECURS=true
+.  endfor
+
+_internal-fake:
+.  for _kernel in ${KERNELS}
+	@cd ${.CURDIR} && \
+		exec ${MAKE} fake PATCH=${PATCH} KERNEL=${_kernel} _KERNELS_RECURS=true
+.  endfor
+
+_internal-package:
+.  for _kernel in ${KERNELS}
+	@cd ${.CURDIR} && \
+		exec ${MAKE} package PATCH=${PATCH} KERNEL=${_kernel} _KERNELS_RECURS=true
+.  endfor
+
+.else
 _internal-build: ${_BUILD_COOKIE}
 _internal-plist: ${_PLIST_COOKIE}
 _internal-fake: ${_FAKE_COOKIE}
 _internal-package: ${_PACKAGE}
+.endif
 
-
-# The real targets. Note that some parts always get run, some parts can be
-# disabled, and there are hooks to override behavior.
 
 #####################################################
 # System extraction
