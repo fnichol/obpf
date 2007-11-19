@@ -70,6 +70,10 @@ PATCHDIST ?= ${WRKDIR}/patches-${OSREV}
 FAKEDIR ?= ${WRKDIR}/fake-${OSREV}
 PACKAGE_REPOSITORY ?= ${.CURDIR}/packages
 
+.if defined(K)
+KERNEL = ${K}
+.endif
+
 KERNEL ?= GENERIC
 
 .if defined(P)
