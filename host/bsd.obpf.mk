@@ -66,7 +66,7 @@ FULLDISTDIR ?= ${_DISTDIR}
 DISTNAME ?= openbsd-${OSREV}
 WRKDIR ?= ${.CURDIR}/w-${DISTNAME}
 WRKDIST ?= ${WRKDIR}/${DISTNAME}
-PATCHDIST ?= ${WRKDIR}/patches-${OSREV}
+PATCHDIST := ${WRKDIR}/patches-${OSREV}
 FAKEDIR ?= ${WRKDIR}/fake-${OSREV}
 PACKAGE_REPOSITORY ?= ${.CURDIR}/packages
 
@@ -263,7 +263,7 @@ ALLFILES = ${_DISTFILES}
 .if exists(${PATCHDIST}/${OSREV}/common) && exists(${PATCHDIST}/${OSREV}/${MACHINE})
 _PATCHFILES != \
 		${FIND} ${PATCHDIST}/${OSREV}/common ${PATCHDIST}/${OSREV}/${MACHINE} \
-		-type f | ${SORT} -t '/' -k 3
+		-type f -print | ${AWK} -F'/' '{ print $$NF }' | sort
 PATCHFILES = ${_PATCHFILES:T}
 PATCHES = ${PATCHFILES:C/\.patch$//}
 .endif
