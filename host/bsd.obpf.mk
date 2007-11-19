@@ -179,18 +179,14 @@ clean = ${_internal-clean}
 # need to go through an extra var because clean is set in stone,
 # on the cmdline.
 _clean = ${clean}
-.if empty(_clean) || ${_clean:L} == "depends"
+.if empty(_clean)
 _clean += work
 .endif
 .if ${_clean:L:Mwork}
 _clean += fake
 .endif
-.if ${_clean:L:Mforce}
-_clean += -f
-.endif
 # check that clean is clean
-_okay_words = depends work fake -f flavors dist install sub packages package \
-	readmes bulk force plist
+_okay_words = work fake dist packages
 .for _w in ${_clean:L}
 .  if !${_okay_words:M${_w}}
 ERRORS += "Fatal: unknown clean command: ${_w}"
@@ -722,6 +718,18 @@ _internal-clean:
 		${RM} -f ${ALLFILES}; \
 	fi
 	@${RM} -rf ${FULLDISTDIR}
+.endif
+.if ${_clean:L:Mfake}
+.  if defined(PATCH)
+	@cd ${.CURDIR} && exec ${MAKE} _check-patchfile PATCH=${PATCH}
+	@${RM} -rf ${FAKEDIR}/${PATCH_DISP}
+.  else
+	@${RM} -rf ${FAKEDIR}
+.  endif
+.endif
+.if ${_clean:L:Mpackages}
+	@${ECHO_MSG} "===>  Packages cleaning"
+	@${RM} -rf ${PACKAGE_REPOSITORY}
 .endif
 
 
