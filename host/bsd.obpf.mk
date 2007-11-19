@@ -798,6 +798,8 @@ m-cleandir-wrp = make -f Makefile.bsd-wrapper cleandir
 m-depend-wrp = make -f Makefile.bsd-wrapper depend
 m-wrp = make -f Makefile.bsd-wrapper
 m-install-wrp = make -f Makefile.bsd-wrapper install
+m-std-wrp = ${m-obj-wrp} && ${m-cleandir-wrp} && \
+	${m-depend-wrp} && ${m-wrp} && ${m-install-wrp}
 
 m-kernel = echo iskernel
 
