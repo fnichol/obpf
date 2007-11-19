@@ -79,7 +79,6 @@ PATCH = ${P}
 .if defined(PATCH) 
 .  if exists(${PATCHDIST}/${OSREV}/common/${PATCH}.patch) || exists(${PATCHDIST}/${OSREV}/${MACHINE}/${PATCH}.patch)
 PATCHFILE != ${FIND} ${PATCHDIST} -type f -name ${PATCH}.patch
-_PACKAGE = ${PACKAGE_REPOSITORY}/obpf-${OSREV}-${MACHINE}-${PATCH}.tgz
 _PRE_IS_KERNEL != grep '^m-kernel =' bsd.obpf.mk | cat - Makefile | \
 	grep -v '^include' | ${MAKE} -n -f - ${PATCH}
 _IS_KERNEL != if [ "${_PRE_IS_KERNEL}" == "echo iskernel" ]; then echo true; else echo false; fi
@@ -102,6 +101,11 @@ PATCH_DISP = ${PATCH}-${KERNEL}
 PATCH_DISP = ${PATCH}
 .endif
 
+.if defined(PATCH) 
+.  if exists(${PATCHDIST}/${OSREV}/common/${PATCH}.patch) || exists(${PATCHDIST}/${OSREV}/${MACHINE}/${PATCH}.patch)
+_PACKAGE = ${PACKAGE_REPOSITORY}/obpf-${OSREV}-${MACHINE}-${PATCH_DISP}.tgz
+.  endif
+.endif
 
 _WRKDIR_COOKIE = ${WRKDIR}/.extract_started
 _EXTRACT_COOKIE = ${WRKDIR}/.extract_done
