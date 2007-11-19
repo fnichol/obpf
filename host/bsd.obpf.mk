@@ -574,6 +574,9 @@ ${_BUILD_COOKIE}: ${_PATCH_COOKIE}
 #####################################################
 ${_PLIST_COOKIE}: ${_BUILD_COOKIE}
 	@cd ${.CURDIR} && exec ${MAKE} _check-patchfile PATCH=${PATCH}
+.if ${_IS_KERNEL} == "true"
+	@cd ${.CURDIR} && exec ${MAKE} _check-kernelfile KERNEL=${KERNEL}
+.endif
 	@${ECHO_MSG} "===> Building plist for ${PATCH_DISP}"
 .if target(pre-plist)
 	@cd ${.CURDIR} && exec ${MAKE} pre-plist
@@ -606,6 +609,9 @@ do-plist:
 #####################################################
 ${_FAKE_COOKIE}: ${_PLIST_COOKIE}
 	@cd ${.CURDIR} && exec ${MAKE} _check-patchfile PATCH=${PATCH}
+.if ${_IS_KERNEL} == "true"
+	@cd ${.CURDIR} && exec ${MAKE} _check-kernelfile KERNEL=${KERNEL}
+.endif
 	@${ECHO_MSG} "===> Faking package creation for ${PATCH_DISP}"
 .if target(pre-fake)
 	@cd ${.CURDIR} && exec ${MAKE} pre-fake
@@ -644,6 +650,9 @@ do-fake:
 #####################################################
 ${_PACKAGE}: ${_FAKE_COOKIE}
 	@cd ${.CURDIR} && exec ${MAKE} _check-patchfile PATCH=${PATCH}
+.if ${_IS_KERNEL} == "true"
+	@cd ${.CURDIR} && exec ${MAKE} _check-kernelfile KERNEL=${KERNEL}
+.endif
 	@${ECHO_MSG} "===> Packaging for ${PATCH_DISP}"
 .if target(pre-package)
 	@cd ${.CURDIR} && exec ${MAKE} pre-package
