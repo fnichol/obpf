@@ -790,7 +790,11 @@ _internal-all-packages:
 .endfor
 
 all-packages: ${_CONFIGURE_COOKIE}
-	@cd ${.CURDIR} && exec ${MAKE} _internal-all-packages
+.if defined(KERNELS)
+	@cd ${.CURDIR} && exec ${MAKE} _internal-all-packages KERNELS="${KERNELS}"
+.else
+	@cd ${.CURDIR} && exec ${MAKE} _internal-all-packages KERNEL="${KERNEL}"
+.endif
 
 
 #####################################################
