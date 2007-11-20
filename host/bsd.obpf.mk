@@ -778,6 +778,12 @@ _internal-info:
 info: ${_CONFIGURE_COOKIE} _check-patchfile
 	@cd ${.CURDIR} && exec ${MAKE} _internal-info PATCH=${PATCH}
 
+allpackages:
+.for _p in ${PATCHES}
+	@cd ${.CURDIR} && \
+		exec ${MAKE} package PATCH=${_p} KERNELS="${KERNELS}"
+.endfor
+
 
 #####################################################
 # Shortcut build targets
