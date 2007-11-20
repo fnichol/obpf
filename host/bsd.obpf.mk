@@ -778,11 +778,19 @@ _internal-info:
 info: ${_CONFIGURE_COOKIE} _check-patchfile
 	@cd ${.CURDIR} && exec ${MAKE} _internal-info PATCH=${PATCH}
 
-allpackages:
+_internal-all-packages:
 .for _p in ${PATCHES}
+.  if defined(KERNELS)
 	@cd ${.CURDIR} && \
 		exec ${MAKE} package PATCH=${_p} KERNELS="${KERNELS}"
+.  else
+	@cd ${.CURDIR} && \
+		exec ${MAKE} package PATCH=${_p} KERNEL="${KERNEL}"
+.  endif
 .endfor
+
+all-packages: ${_CONFIGURE_COOKIE}
+	@cd ${.CURDIR} && exec ${MAKE} _internal-all-packages
 
 
 #####################################################
