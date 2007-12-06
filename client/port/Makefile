@@ -42,6 +42,8 @@ PERMIT_PACKAGE_FTP=	Yes
 PERMIT_DISTFILES_CDROM=Yes
 PERMIT_DISTFILES_FTP=	Yes
 
+NO_CHECKSUM=	true
+
 do-fetch:
 
 do-checksum:
