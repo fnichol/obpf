@@ -59,6 +59,6 @@ do-configure:
 do-build:
 
 do-install:
-	${INSTALL_PROGRAM} ${FILESDIR}/obpf ${PREFIX}/bin
+	@${INSTALL_PROGRAM} ${FILESDIR}/obpf ${PREFIX}/bin
 
 .include <bsd.port.mk>
