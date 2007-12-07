@@ -16,12 +16,26 @@ use Pod::Usage;
 use File::Basename;
 
 # command line options
+my %Cmd_args = ();
+
+# configuration file parsed options
+my %Conf_opts = ();
+
+# final options hash
 my %Options = ();
 
+# default values for each option
 my %Defaults = (
 	"ftp" => "/usr/bin/ftp",
 	"patchurl" => "/"
 	);
+
+# order of and possible locations for options config files
+my @CONF_LOCATIONS = ( dirname($0)."/obpf.conf", $ENV{HOME}."/.obpf", 
+	"/etc/obpf.conf", "obpf.conf" );
+
+# prefix of option environment variables
+my $ENV_PREFIX = "OBPF_";
 
 
 MAIN: {
@@ -30,18 +44,55 @@ MAIN: {
 
 
 sub parse_opts {
-	GetOptions(  \%Options, 
+	GetOptions(  \%Cmd_args, 
 		"help|?", "man", "version", "verbose|v", 
 		"patchurl:s", "ftp:s" ) or pod2usage(2);
 
 	# prints usage if --help option is specified
-	pod2usage( 1 )  if ( exists $Options{help} );
+	pod2usage( 1 )  if ( exists $Cmd_args{help} );
 
 	# prints a manpage if --man option is specified
-	pod2usage( -verbose => 2 )  if ( exists $Options{man} );
+	pod2usage( -verbose => 2 )  if ( exists $Cmd_args{man} );
 
 	# if there are no files given, then exit
 	pod2usage("$0: no files given." )  if ( ( @ARGV == 0 ) && ( -t STDIN) );
+
+	# parse any and all configuration files
+	foreach my $conf_file ( @CONF_LOCATIONS ) {
+		open( CONF, "<$conf_file" ) || next;
+
+		while (<CONF>) {
+			chomp;
+			s/^#.*$//; s/\s+#.*$//; s/^\s*//; s/\s*$//;
+			next if /^$/;
+			if ( /(\w+)\s*=\s*(.+)/ ) {
+			}
+		}
+	}
+
+	# Load in option values
+	foreach my $option (keys %Defaults) {
+		my $env = uc( "$ENV_PREFIX$option" );
+
+		if ( exists $ENV{$env} ) {
+			# Look for environment variable options (e.g. OBPF_OPTION)
+			$Options{$option} = $ENV{$env};
+		}
+		elsif ( exists $Cmd_args{$option} ) {
+			# Look for command line options (e.g --OPTION=something)
+			$Options{$option} = $Cmd_args{$option};
+		}
+		elsif ( exists $Conf_opts{$option} ) {
+			# Look for configuration file options (e.g. OPTION=something)
+			$Options{$option} = $Conf_opts{$option};
+		}
+		else {
+			# Otherwise use the builtin default
+			$Options{$option} = $Defaults{$option};
+		}
+
+		print ">>$option=$Options{$option}\n";
+	}
 }
 
 
