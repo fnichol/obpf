@@ -57,18 +57,7 @@ sub parse_opts {
 	# if there are no files given, then exit
 	pod2usage("$0: no files given." )  if ( ( @ARGV == 0 ) && ( -t STDIN) );
 
-	# parse any and all configuration files
-	foreach my $conf_file ( @CONF_LOCATIONS ) {
-		open( CONF, "<$conf_file" ) || next;
-
-		while (<CONF>) {
-			chomp;
-			s/^#.*$//; s/\s+#.*$//; s/^\s*//; s/\s*$//;
-			next if /^$/;
-			if ( /(\w+)\s*=\s*(.+)/ ) {
-			}
-		}
-	}
+	&parse_config_files();
 
 	# Load in option values
 	foreach my $option (keys %Defaults) {
@@ -92,6 +81,26 @@ sub parse_opts {
 		}
 
 		print ">>$option=$Options{$option}\n";
+	}
+}
+
+
+sub parse_config_files {
+	foreach my $conf_file ( @CONF_LOCATIONS ) {
+		open( CONF, "<$conf_file" ) || next;
+
+		while (<CONF>) {
+			chomp;
+
+			# strip out all comment and blank lines
+			s/^#.*$//; s/\s+#.*$//; s/^\s*//; s/\s*$//;
+			next if /^$/;
+
+			# capture config value if it is valid
+			if ( /(\w+)\s*=\s*(.+)/  && exists $Defaults{$1} ) {
+				$Conf_opts{$1} = $2;
+			}
+		}
 	}
 }
 
