@@ -71,7 +71,7 @@ path to the ftp command.
 =item B<--patchurl>=I<URL>
 
 tries to download the patches from this I<URL> or from a list of I<URL>s
-seperated by spaces. Any I<URL> of starting with ftp://, http:// or https://
+seperated by spaces. Any I<URL> of starting with /, ftp://, http:// or https://
 can be used.
 
 =item B<--verbose>, B<-v>
