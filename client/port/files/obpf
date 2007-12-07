@@ -25,12 +25,21 @@ my %Conf_opts = ();
 # final options hash
 my %Options = ();
 
+my $local_arch = `/usr/bin/uname -m`; chomp $local_arch;
+my $local_osrev = `/usr/bin/uname -r`; chomp $local_osrev;
+
 # default values for each option
 my %Defaults = (
+	"arch" => , $local_arch,
 	"ftp" => "/usr/bin/ftp",
+	"kernel" => , "GENERIC",
+	"osrev" => $local_osrev,
 	"patchdir" => "/tmp",
 	"patchurl" => "/"
 	);
+
+undef $local_arch;
+undef $local_osrev;
 
 # order of and possible locations for options config files
 my @CONF_LOCATIONS = ( dirname($0)."/obpf.conf", $ENV{HOME}."/.obpf", 
@@ -54,6 +63,10 @@ MAIN: {
 
 sub process_download {
 	print "here we go for download.\n";
+
+	foreach my $file (@ARGV) {
+		&download_file( $file );
+	}
 }
 
 
@@ -61,11 +74,32 @@ sub process_install {
 	print "here we go for install.\n";
 }
 
+sub download_file {
+	my ( $file ) = @_;
+
+	# if the file has the form "001_mbuf"
+	if ( $file =~ /^\d\d\d_.*$/ && $file !~ /\.tgz$/ ) {
+		$file = "obpf-$Options{osrev}-$Options{arch}-$file";
+	}
+
+	my @sites = split( /\/:/, $Options{patchurl} );
+	foreach my $site (@sites) {
+		$site =~ s/\/$//;
+		$site =~ s/\.tgz$//;
+		print "trying $site/$file.tgz\n";
+
+		`$Options{ftp} -V -m $site/$file.tgz`;
+		if ($?) {
+			print "tring $site/$file-$Options{kernel}.tgz\n";
+			`$Options{ftp} -V -m $site/$file-$Options{kernel}.tgz`;
+		}
+	}
+}
 
 sub parse_opts {
 	GetOptions(  \%Cmd_args, 
-		"help|?", "man", "version", "verbose|v", 
-		"patchdir:s", "patchurl:s", "ftp:s",
+		"help|?", "man", "version", "verbose|v", "arch:s", "osrev:s",
+		"kernel:s", "patchdir:s", "patchurl:s", "ftp:s",
 		"download|d", "install|i" ) or pod2usage(2);
 
 	# prints usage if --help option is specified
@@ -111,6 +145,7 @@ sub parse_opts {
 			# Otherwise use the builtin default
 			$Options{$option} = $Defaults{$option};
 		}
+		print ">>var $option=[$Options{$option}]\n";
 	}
 }
 
@@ -154,6 +189,10 @@ B<obpf> .
 
 =over 4
 
+=item B<--arch>=I<ARCH>
+
+overrides the system architecture used when fetching patches.
+
 =item B<--download>, B<-d>
 
 downloads patches. Patches are downloaded to /tmp or to I<patchdir>, if set.
@@ -166,6 +205,14 @@ I<patchdir>, if set.
 =item B<--ftp>=I<FILE>
 
 path to the ftp command.
+
+=item B<--kernel>=I<KERNEL>
+
+sets the kernel configuration of the patch to download. Default is GENERIC.
+
+=item B<--osrev>=I<VER>
+
+overrides the version of OpenBSD used when fetching patches.
 
 =item B<--patchdir>=I<DIR>
 
