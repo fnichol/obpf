@@ -14,6 +14,7 @@ my $Version = "1.0.0";
 use Getopt::Long;
 use Pod::Usage;
 use File::Basename;
+use Switch;
 
 # command line options
 my %Cmd_args = ();
@@ -27,6 +28,7 @@ my %Options = ();
 # default values for each option
 my %Defaults = (
 	"ftp" => "/usr/bin/ftp",
+	"patchdir" => "/tmp",
 	"patchurl" => "/"
 	);
 
@@ -37,16 +39,34 @@ my @CONF_LOCATIONS = ( dirname($0)."/obpf.conf", $ENV{HOME}."/.obpf",
 # prefix of option environment variables
 my $ENV_PREFIX = "OBPF_";
 
+my @ACTIONS = ( "download", "install" );
+
 
 MAIN: {
 	&parse_opts();
+
+	switch ($Options{action}) {
+		case /^download$/ { &process_download(); }
+		case /^install$/ { &process_install(); }
+	}
+}
+
+
+sub process_download {
+	print "here we go for download.\n";
+}
+
+
+sub process_install {
+	print "here we go for install.\n";
 }
 
 
 sub parse_opts {
 	GetOptions(  \%Cmd_args, 
 		"help|?", "man", "version", "verbose|v", 
-		"patchurl:s", "ftp:s" ) or pod2usage(2);
+		"patchdir:s", "patchurl:s", "ftp:s",
+		"download|d", "install|i" ) or pod2usage(2);
 
 	# prints usage if --help option is specified
 	pod2usage( 1 )  if ( exists $Cmd_args{help} );
@@ -54,8 +74,20 @@ sub parse_opts {
 	# prints a manpage if --man option is specified
 	pod2usage( -verbose => 2 )  if ( exists $Cmd_args{man} );
 
-	# if there are no files given, then exit
-	pod2usage("$0: no files given." )  if ( ( @ARGV == 0 ) && ( -t STDIN) );
+	# load in actions into options
+	my $num_actions = 0;
+	foreach my $action (@ACTIONS) {
+		if ( exists $Cmd_args{$action} ) {
+			$Options{action} = $action;
+			$num_actions++;
+		}
+	}
+
+	# if no actions are defined, then exit
+	pod2usage("$0: no action given." )  if ( $num_actions == 0 );
+
+	# if multiple actions are defined, then exit
+	pod2usage("$0: multiple actions given." )  if ( $num_actions > 1 );
 
 	&parse_config_files();
 
@@ -79,8 +111,6 @@ sub parse_opts {
 			# Otherwise use the builtin default
 			$Options{$option} = $Defaults{$option};
 		}
-
-		print ">>$option=$Options{$option}\n";
 	}
 }
 
@@ -114,7 +144,7 @@ obpf -
 
 =head1 SYNOPSIS
 
-B<obpf> [B<-v>] [B<--version>] [B<--ftp>=I<FILE>] [B<--patchurl>=I<URL>] I<profile>
+B<obpf> [B<-v>] [B<--version>] [B<--ftp>=I<FILE>] [B<--patchurl>=I<URL>]
 
 =head1 DESCRIPTION
 
@@ -124,9 +154,22 @@ B<obpf> .
 
 =over 4
 
+=item B<--download>, B<-d>
+
+downloads patches. Patches are downloaded to /tmp or to I<patchdir>, if set.
+
+=item B<--install>, B<-i>
+
+downloads and installs patches. Patches are downloaded to /tmp or to 
+I<patchdir>, if set.
+
 =item B<--ftp>=I<FILE>
 
 path to the ftp command.
+
+=item B<--patchdir>=I<DIR>
+
+sets the directory to which patches are downloaded. The default is /tmp.
 
 =item B<--patchurl>=I<URL>
 
