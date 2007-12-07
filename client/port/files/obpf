@@ -18,6 +18,11 @@ use File::Basename;
 # command line options
 my %Options = ();
 
+my %Defaults = (
+	"ftp" => "/usr/bin/ftp",
+	"patchurl" => "/"
+	);
+
 
 MAIN: {
 	&parse_opts();
@@ -26,7 +31,8 @@ MAIN: {
 
 sub parse_opts {
 	GetOptions(  \%Options, 
-		"help|?", "man", "version|V", "patchurl=s" ) or pod2usage(2);
+		"help|?", "man", "version", "verbose|v", 
+		"patchurl:s", "ftp:s" ) or pod2usage(2);
 
 	# prints usage if --help option is specified
 	pod2usage( 1 )  if ( exists $Options{help} );
@@ -48,7 +54,7 @@ obpf -
 
 =head1 SYNOPSIS
 
-B<obpf> [B<-V>] [B<--patchurl>=I<URL>] I<profile>
+B<obpf> [B<-v>] [B<--version>] [B<--ftp>=I<FILE>] [B<--patchurl>=I<URL>] I<profile>
 
 =head1 DESCRIPTION
 
@@ -58,21 +64,43 @@ B<obpf> .
 
 =over 4
 
+=item B<--ftp>=I<FILE>
+
+path to the ftp command.
+
 =item B<--patchurl>=I<URL>
 
 tries to download the patches from this I<URL> or from a list of I<URL>s
 seperated by spaces. Any I<URL> of starting with ftp://, http:// or https://
 can be used.
 
-=item B<--version>, B<-V>
+=item B<--verbose>, B<-v>
+
+shows more verbose output.
+
+=item B<--version>
 
 displays the version of the program
 
 =back
 
-=head1 SEE ALSO
+=head1 EXAMPLES
 
-perl(1)
+.
+
+=head1 ENVIRONMENT VARIABLES
+
+=over 4
+
+=item B<OBPF_FTP>
+
+see B<--ftp> option.
+
+=item B<OBPF_PATCHURL>
+
+see B<--patchurl> option.
+
+=back
 
 =head1 AUTHOR
 
