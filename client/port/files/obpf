@@ -86,12 +86,21 @@ sub download_file {
 	foreach my $site (@sites) {
 		$site =~ s/\/$//;
 		$site =~ s/\.tgz$//;
-		print "trying $site/$file.tgz\n";
 
-		`$Options{ftp} -V -m $site/$file.tgz`;
+		my $ftp_cmd = "$Options{ftp} -V -m";
+
+		my $fetchurl = "$site/$file.tgz";
+		my $destfile = $fetchurl;
+		$destfile =~ s/^$site\//$Options{patchdir}\//g;
+		print "trying $fetchurl\n";
+		`$ftp_cmd -o $destfile $fetchurl`;
+
 		if ($?) {
-			print "tring $site/$file-$Options{kernel}.tgz\n";
-			`$Options{ftp} -V -m $site/$file-$Options{kernel}.tgz`;
+			$fetchurl = "$site/$file-$Options{kernel}.tgz";
+			my $destfile = $fetchurl;
+			$destfile =~ s/^$site\//$Options{patchdir}\//g;
+			print "tring $fetchurl\n";
+			`$ftp_cmd -o $destfile $fetchurl`;
 		}
 	}
 }
