@@ -33,6 +33,7 @@ my $local_osrev = `/usr/bin/uname -r`; chomp $local_osrev;
 # default values for each option
 my %Defaults = (
 	"arch" => , $local_arch,
+	"db" => "/var/obpf",
 	"ftp" => "/usr/bin/ftp",
 	"kernel" => , "GENERIC",
 	"osrev" => $local_osrev,
@@ -170,7 +171,7 @@ sub get_file {
 sub parse_opts {
 	GetOptions(  \%Cmd_args, 
 		"help|?", "man", "version", "verbose|v", "force|f", "arch:s", "osrev:s",
-		"kernel:s", "patchdir:s", "patchurl:s", "ftp:s", "root:s",
+		"kernel:s", "patchdir:s", "patchurl:s", "ftp:s", "root:s", "db:s",
 		"download|d", "install|i", "read|r" ) or pod2usage(2);
 
 	if ( exists $Cmd_args{version} ) {
@@ -287,6 +288,10 @@ sets the directory to which patches are downloaded. The default is /tmp.
 =item B<--arch>=I<ARCH>
 
 overrides the system architecture used when fetching patches.
+
+=item B<--db>=I<DIR>
+
+root of the obpf database. The default is /var/obpf.
 
 =item B<--force>, B<-f>
 
