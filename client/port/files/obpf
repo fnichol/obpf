@@ -10,6 +10,7 @@ use warnings;
 ##
 
 my $Version = "1.0.0";
+my $Is_verbose = 0;
 
 use Getopt::Long;
 use Pod::Usage;
@@ -67,39 +68,15 @@ MAIN: {
 
 
 sub process_download {
-	my @sites = split( /\/:/, $Options{patchurl} );
-
 	my $all_success = 1;
-	foreach my $file (@ARGV) {
-		foreach my $site (@sites) {
-			# strip out any trailing slash on site
-			$site =~ s/^(.+)\/$/$1/;
 
-			my $fetch_success = 0;
-			if ( $site =~ /^\// ) {
-				$fetch_success = \
-					&get_file( $file, $site, "/bin/cp #SOURCE# #DEST#" );
-			}
-			else {
-				$fetch_success = 
-					&get_file( $file, $site, "$Options{ftp} -V -m #SOURCE#" );
-			}
-
-			if ( $fetch_success ) {
-				print "Patch $file download success.\n";
-			}
-			else {
-				print "Patch $file download not successful.\n";
-				$all_success = 0;
-			}
-		}
+	foreach my $token (@ARGV) {
+		$all_success = &download_token( $token );
 	}
 
 	if ( ! $all_success ) {
 		print "Download summary: there were some failures.\n";
 	}
-
-	return $all_success;
 }
 
 
@@ -110,40 +87,67 @@ sub process_install {
 
 sub process_read {
 	print "here we go for read.\n";
+
+	foreach my $token (@ARGV) {
+		my $install_loc = &find_installed_patch( $token );
+		if ( $install_loc ) {
+			print "Found $token installed at $install_loc\n";
+		}
+		else {
+			print "$token is not install in $Options{db}\n";
+		}
+	}
+}
+
+
+sub download_token {
+	my ( $token ) = @_;
+
+	my @sites = split( /\/:/, $Options{patchurl} );
+
+	foreach my $site (@sites) {
+		# strip out any trailing slash on site
+		$site =~ s/^(.+)\/$/$1/;
+
+		my $fetch_success = 0;
+		if ( $site =~ /^\// ) {
+			$fetch_success = \
+				&get_file( $token, $site, "/bin/cp #SOURCE# #DEST#" );
+		}
+		else {
+			$fetch_success = 
+				&get_file( $token, $site, "$Options{ftp} -V -m #SOURCE#" );
+		}
+
+		if ( $fetch_success == 1 ) {
+			print "Patch $token download success.\n";
+		}
+
+		if ( $fetch_success ) {
+			return $fetch_success;
+		}
+	}
+
+	print "Patch $token download not successful.\n";
+	return 0;
 }
 
 
 sub get_file {
 	my ( $file, $site, $fetch_str ) = @_;
 
-	my @guesses = ( 
-		"obpf-$Options{osrev}-$Options{arch}-$file.tgz", 
-		"obpf-$Options{osrev}-$Options{arch}-$file-$Options{kernel}.tgz" );
-
 	#
-	# if $file is the fully qualified path name, then add it to the front
-	# of the list of file guesses
+	# if we aren't forcing the download and the file exists, then we can
+	# consider this success
 	#
-	if ( $file =~ /^obpf-$Options{osrev}-$Options{arch}-\d{3}_.+\.tgz$/ ) {
-		@guesses = ( $file, @guesses );
+	my $dest = find_fetched_file( $file );
+	if ( $dest && ! exists $Cmd_args{force} ) {
+		print "File already exists: $dest\n";
+		$Fetched_files{$file} = $dest;
+		return 2;
 	}
 
-	# try to find a previously downloaded version of the $file
-	foreach my $guess (@guesses) {
-		my $dest = "$Options{patchdir}/$guess";
-
-		#
-		# if we aren't forcing the download and the file exists, then we can
-		# consider this success
-		#
-		if ( -r "$dest" && ! exists $Cmd_args{force} ) {
-			print "File already exists: $dest\n";
-			$Fetched_files{$file} = $dest;
-			return 1;
-		}
-	}
-
-	foreach my $guess (@guesses) {
+	foreach my $guess ( &make_fetch_guess_list($file) ) {
 		my $dest = "$Options{patchdir}/$guess";
 
 		# determine the final fetch command to be executed
@@ -151,7 +155,7 @@ sub get_file {
 		$fetch_cmd =~ s/#SOURCE#/$site\/$guess/g;
 		$fetch_cmd =~ s/#DEST#/$dest/g;
 
-		print "Trying to fetch $site/$guess ...\n";
+		print "Trying $site/$guess ...\n";
 
 		# run the command to fetch the file
 		system( "cd $Options{patchdir}; $fetch_cmd" );
@@ -168,6 +172,72 @@ sub get_file {
 }
 
 
+sub make_fetch_guess_list {
+	my ( $file ) = @_;
+
+	my @guesses = ( 
+		"obpf-$Options{osrev}-$Options{arch}-$file.tgz", 
+		"obpf-$Options{osrev}-$Options{arch}-$file-$Options{kernel}.tgz" );
+
+	#
+	# if $file is the fully qualified path name, then add it to the front
+	# of the list of file guesses
+	#
+	if ( $file =~ /^obpf-$Options{osrev}-$Options{arch}-\d{3}_.+\.tgz$/ ) {
+		@guesses = ( $file, @guesses );
+	}
+
+	return @guesses;
+}
+
+
+sub make_installed_guess_list {
+	my ( $file ) = @_;
+
+	my @guesses = ( "$file", "$file-$Options{kernel}" );
+
+	#
+	# if $file is the fully qualified path name, then add it to the front
+	# of the list of file guesses
+	#
+	if ( $file =~ /^obpf-$Options{osrev}-$Options{arch}-(\d{3}_.+)\.tgz$/ ) {
+		@guesses = ( $1, @guesses );
+	}
+
+	return @guesses;
+}
+
+
+sub find_fetched_file {
+	my ( $token ) = @_;
+
+	# try to find a previously downloaded version of the $token
+	foreach my $guess ( &make_fetch_guess_list($token) ) {
+		if ( -r "$Options{patchdir}/$guess" ) {
+			return "$Options{patchdir}/$guess";
+		}
+	}
+
+	# if we haven't found the file by now, it ain't here
+	return undef;
+}
+
+
+sub find_installed_patch {
+	my ( $token ) = @_;
+
+	# try to find a previously downloaded version of the $file
+	foreach my $guess ( &make_installed_guess_list($token) ) {
+		if ( -d "$Options{db}/$guess" ) {
+			return "$Options{db}/$guess";
+		}
+	}
+
+	# if we haven't found the file by now, it ain't here
+	return undef;
+}
+
+
 sub parse_opts {
 	GetOptions(  \%Cmd_args, 
 		"help|?", "man", "version", "verbose|v", "force|f", "arch:s", "osrev:s",
@@ -178,6 +248,8 @@ sub parse_opts {
 		print "obpf version $Version.\n";
 		exit;
 	}
+
+	$Is_verbose = 1  if ( exists $Cmd_args{verbose} );
 
 	# prints usage if --help option is specified
 	pod2usage( 1 )  if ( exists $Cmd_args{help} );
@@ -202,6 +274,8 @@ sub parse_opts {
 
 	&parse_config_files();
 
+	print "===== Runtime Options ==\n"  if ( $Is_verbose );
+
 	# Load in option values
 	foreach my $option (keys %Defaults) {
 		my $env = uc( "$ENV_PREFIX$option" );
@@ -222,8 +296,11 @@ sub parse_opts {
 			# Otherwise use the builtin default
 			$Options{$option} = $Defaults{$option};
 		}
-		print ">>$option = [$Defaults{$option}]\n";
+
+		print ">> Option $option=[$Options{$option}]\n"  if ( $Is_verbose );
 	}
+
+	print "========================\n\n"  if ( $Is_verbose );
 }
 
 
