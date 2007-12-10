@@ -25,6 +25,8 @@ my %Conf_opts = ();
 # final options hash
 my %Options = ();
 
+my %Fetched_files = ();
+
 my $local_arch = `/usr/bin/uname -m`; chomp $local_arch;
 my $local_osrev = `/usr/bin/uname -r`; chomp $local_osrev;
 
@@ -48,7 +50,7 @@ my @CONF_LOCATIONS = ( dirname($0)."/obpf.conf", $ENV{HOME}."/.obpf",
 # prefix of option environment variables
 my $ENV_PREFIX = "OBPF_";
 
-my @ACTIONS = ( "download", "install" );
+my @ACTIONS = ( "download", "install", "read" );
 
 
 MAIN: {
@@ -57,6 +59,7 @@ MAIN: {
 	switch ($Options{action}) {
 		case /^download$/ { &process_download(); }
 		case /^install$/ { &process_install(); }
+		case /^read$/ { &process_read(); }
 	}
 }
 
@@ -103,6 +106,11 @@ sub process_install {
 }
 
 
+sub process_read {
+	print "here we go for read.\n";
+}
+
+
 sub get_file {
 	my ( $file, $site, $fetch_str ) = @_;
 
@@ -127,6 +135,7 @@ sub get_file {
 		#
 		if ( -r "$dest" && ! exists $Cmd_args{force} ) {
 			print "File already exists: $dest\n";
+			$Fetched_files{$file} = $dest;
 			return 1;
 		}
 
@@ -142,6 +151,7 @@ sub get_file {
 
 		# if the exit value of the fetch command was 0, then success
 		if ( $? >> 8 == 0 ) {
+			$Fetched_files{$file} = $dest;
 			return 1;
 		}
 	}
@@ -155,7 +165,7 @@ sub parse_opts {
 	GetOptions(  \%Cmd_args, 
 		"help|?", "man", "version", "verbose|v", "force|f", "arch:s", "osrev:s",
 		"kernel:s", "patchdir:s", "patchurl:s", "ftp:s",
-		"download|d", "install|i" ) or pod2usage(2);
+		"download|d", "install|i", "read|r" ) or pod2usage(2);
 
 	# prints usage if --help option is specified
 	pod2usage( 1 )  if ( exists $Cmd_args{help} );
@@ -233,11 +243,30 @@ obpf -
 
 =head1 SYNOPSIS
 
-B<obpf> [B<-v>] [B<--version>] [B<--ftp>=I<FILE>] [B<--patchurl>=I<URL>]
+B<obpf> [I<OPTION> I<...>] I<ACTION> I<TOKENS> [I<...>]
 
 =head1 DESCRIPTION
 
 B<obpf> .
+
+=head1 ACTIONS
+
+=over 4
+
+=item B<--download>, B<-d>
+
+downloads patches. Patches are downloaded to /tmp or to I<patchdir>, if set.
+
+=item B<--install>, B<-i>
+
+downloads and installs patches. Patches are downloaded to /tmp or to 
+I<patchdir>, if set.
+
+=item B<--read>, B<-r>
+
+sets the directory to which patches are downloaded. The default is /tmp.
+
+=back
 
 =head1 OPTIONS
 
@@ -247,18 +276,9 @@ B<obpf> .
 
 overrides the system architecture used when fetching patches.
 
-=item B<--download>, B<-d>
-
-downloads patches. Patches are downloaded to /tmp or to I<patchdir>, if set.
-
 =item B<--force>, B<-f>
 
 forces the download to proceed even if the patch has been previously downloaded.
-
-=item B<--install>, B<-i>
-
-downloads and installs patches. Patches are downloaded to /tmp or to 
-I<patchdir>, if set.
 
 =item B<--ftp>=I<FILE>
 
