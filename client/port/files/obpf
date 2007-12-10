@@ -62,23 +62,39 @@ MAIN: {
 
 
 sub process_download {
-	print "here we go for download.\n";
-
 	my @sites = split( /\/:/, $Options{patchurl} );
 
+	my $all_success = 1;
 	foreach my $file (@ARGV) {
 		foreach my $site (@sites) {
 			# strip out any trailing slash on site
-			$site =~ s/^([^\/].+)\/$/$1/;
-	
+			$site =~ s/^(.+)\/$/$1/;
+
+			my $fetch_success = 0;
 			if ( $site =~ /^\// ) {
-				&get_local_file( $file, $site );
+				$fetch_success = \
+					&get_file( $file, $site, "/bin/cp #SOURCE# #DEST#" );
 			}
 			else {
-				&get_remote_file( $file, $site );
+				$fetch_success = 
+					&get_file( $file, $site, "$Options{ftp} -V -m #SOURCE#" );
+			}
+
+			if ( $fetch_success ) {
+				print "Patch $file download success.\n";
+			}
+			else {
+				print "Patch $file download not successful.\n";
+				$all_success = 0;
 			}
 		}
 	}
+
+	if ( ! $all_success ) {
+		print "Download summary: there were some failures.\n";
+	}
+
+	return $all_success;
 }
 
 
@@ -87,15 +103,8 @@ sub process_install {
 }
 
 
-sub get_local_file {
-	my ( $file, $dir ) = @_;
-}
-
-
-sub get_remote_file {
-	my ( $file, $site ) = @_;
-
-	my $fetch_cmd = "$Options{ftp} -V -m";
+sub get_file {
+	my ( $file, $site, $fetch_str ) = @_;
 
 	my @guesses = ( 
 		"obpf-$Options{osrev}-$Options{arch}-$file.tgz", 
@@ -110,11 +119,29 @@ sub get_remote_file {
 	}
 
 	foreach my $guess (@guesses) {
-		print "trying $site/$guess ...\n";
-		system( "cd $Options{patchdir}; $fetch_cmd $site/$guess" );
+		my $dest = "$Options{patchdir}/$guess";
 
+		#
+		# if we aren't forcing the download and the file exists, then we can
+		# consider this success
+		#
+		if ( -r "$dest" && ! exists $Cmd_args{force} ) {
+			print "File already exists: $dest\n";
+			return 1;
+		}
+
+		# determine the final fetch command to be executed
+		my $fetch_cmd = $fetch_str;
+		$fetch_cmd =~ s/#SOURCE#/$site\/$guess/g;
+		$fetch_cmd =~ s/#DEST#/$dest/g;
+
+		print "Trying to fetch $site/$guess ...\n";
+
+		# run the command to fetch the file
+		system( "cd $Options{patchdir}; $fetch_cmd" );
+
+		# if the exit value of the fetch command was 0, then success
 		if ( $? >> 8 == 0 ) {
-			# if the exit value of the fetch command was 0, then success
 			return 1;
 		}
 	}
@@ -126,7 +153,7 @@ sub get_remote_file {
 
 sub parse_opts {
 	GetOptions(  \%Cmd_args, 
-		"help|?", "man", "version", "verbose|v", "arch:s", "osrev:s",
+		"help|?", "man", "version", "verbose|v", "force", "arch:s", "osrev:s",
 		"kernel:s", "patchdir:s", "patchurl:s", "ftp:s",
 		"download|d", "install|i" ) or pod2usage(2);
 
@@ -223,6 +250,10 @@ overrides the system architecture used when fetching patches.
 =item B<--download>, B<-d>
 
 downloads patches. Patches are downloaded to /tmp or to I<patchdir>, if set.
+
+=item B<--force>
+
+forces the download to proceed even if the patch has been previously downloaded.
 
 =item B<--install>, B<-i>
 
