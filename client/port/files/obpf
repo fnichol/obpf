@@ -167,6 +167,11 @@ sub parse_opts {
 		"kernel:s", "patchdir:s", "patchurl:s", "ftp:s",
 		"download|d", "install|i", "read|r" ) or pod2usage(2);
 
+	if ( exists $Cmd_args{version} ) {
+		print "obpf version $Version.\n";
+		exit;
+	}
+
 	# prints usage if --help option is specified
 	pod2usage( 1 )  if ( exists $Cmd_args{help} );
 
@@ -284,9 +289,17 @@ forces the download to proceed even if the patch has been previously downloaded.
 
 path to the ftp command.
 
+=item B<--help>, B<-?>
+
+displays a help usage
+
 =item B<--kernel>=I<KERNEL>
 
 sets the kernel configuration of the patch to download. Default is GENERIC.
+
+=item B<--man>
+
+displays the full manpage for this program
 
 =item B<--osrev>=I<VER>
 
