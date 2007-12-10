@@ -126,6 +126,7 @@ sub get_file {
 		@guesses = ( $file, @guesses );
 	}
 
+	# try to find a previously downloaded version of the $file
 	foreach my $guess (@guesses) {
 		my $dest = "$Options{patchdir}/$guess";
 
@@ -138,6 +139,10 @@ sub get_file {
 			$Fetched_files{$file} = $dest;
 			return 1;
 		}
+	}
+
+	foreach my $guess (@guesses) {
+		my $dest = "$Options{patchdir}/$guess";
 
 		# determine the final fetch command to be executed
 		my $fetch_cmd = $fetch_str;
