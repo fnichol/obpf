@@ -153,7 +153,7 @@ sub get_file {
 
 sub parse_opts {
 	GetOptions(  \%Cmd_args, 
-		"help|?", "man", "version", "verbose|v", "force", "arch:s", "osrev:s",
+		"help|?", "man", "version", "verbose|v", "force|f", "arch:s", "osrev:s",
 		"kernel:s", "patchdir:s", "patchurl:s", "ftp:s",
 		"download|d", "install|i" ) or pod2usage(2);
 
@@ -251,7 +251,7 @@ overrides the system architecture used when fetching patches.
 
 downloads patches. Patches are downloaded to /tmp or to I<patchdir>, if set.
 
-=item B<--force>
+=item B<--force>, B<-f>
 
 forces the download to proceed even if the patch has been previously downloaded.
 
