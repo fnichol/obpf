@@ -64,8 +64,20 @@ MAIN: {
 sub process_download {
 	print "here we go for download.\n";
 
+	my @sites = split( /\/:/, $Options{patchurl} );
+
 	foreach my $file (@ARGV) {
-		&download_file( $file );
+		foreach my $site (@sites) {
+			# strip out any trailing slash on site
+			$site =~ s/^([^\/].+)\/$/$1/;
+	
+			if ( $site =~ /^\// ) {
+				&get_local_file( $file, $site );
+			}
+			else {
+				&get_remote_file( $file, $site );
+			}
+		}
 	}
 }
 
@@ -74,36 +86,43 @@ sub process_install {
 	print "here we go for install.\n";
 }
 
-sub download_file {
-	my ( $file ) = @_;
 
-	# if the file has the form "001_mbuf"
-	if ( $file =~ /^\d\d\d_.*$/ && $file !~ /\.tgz$/ ) {
-		$file = "obpf-$Options{osrev}-$Options{arch}-$file";
+sub get_local_file {
+	my ( $file, $dir ) = @_;
+}
+
+
+sub get_remote_file {
+	my ( $file, $site ) = @_;
+
+	my $fetch_cmd = "$Options{ftp} -V -m";
+
+	my @guesses = ( 
+		"obpf-$Options{osrev}-$Options{arch}-$file.tgz", 
+		"obpf-$Options{osrev}-$Options{arch}-$file-$Options{kernel}.tgz" );
+
+	#
+	# if $file is the fully qualified path name, then add it to the front
+	# of the list of file guesses
+	#
+	if ( $file =~ /^obpf-$Options{osrev}-$Options{arch}-\d{3}_.+\.tgz$/ ) {
+		@guesses = ( $file, @guesses );
 	}
 
-	my @sites = split( /\/:/, $Options{patchurl} );
-	foreach my $site (@sites) {
-		$site =~ s/\/$//;
-		$site =~ s/\.tgz$//;
+	foreach my $guess (@guesses) {
+		print "trying $site/$guess ...\n";
+		system( "cd $Options{patchdir}; $fetch_cmd $site/$guess" );
 
-		my $ftp_cmd = "$Options{ftp} -V -m";
-
-		my $fetchurl = "$site/$file.tgz";
-		my $destfile = $fetchurl;
-		$destfile =~ s/^$site\//$Options{patchdir}\//g;
-		print "trying $fetchurl\n";
-		`$ftp_cmd -o $destfile $fetchurl`;
-
-		if ($?) {
-			$fetchurl = "$site/$file-$Options{kernel}.tgz";
-			my $destfile = $fetchurl;
-			$destfile =~ s/^$site\//$Options{patchdir}\//g;
-			print "tring $fetchurl\n";
-			`$ftp_cmd -o $destfile $fetchurl`;
+		if ( $? >> 8 == 0 ) {
+			# if the exit value of the fetch command was 0, then success
+			return 1;
 		}
 	}
+
+	# if all attempts have failed, then return false
+	return 0;
 }
+
 
 sub parse_opts {
 	GetOptions(  \%Cmd_args, 
@@ -154,7 +173,6 @@ sub parse_opts {
 			# Otherwise use the builtin default
 			$Options{$option} = $Defaults{$option};
 		}
-		print ">>var $option=[$Options{$option}]\n";
 	}
 }
 
