@@ -15,6 +15,7 @@ my $Is_verbose = 0;
 use Getopt::Long;
 use Pod::Usage;
 use File::Basename;
+use File::Temp qw/ tempfile tempdir /;
 use Switch;
 
 # command line options
@@ -40,7 +41,8 @@ my %Defaults = (
 	"osrev" => $local_osrev,
 	"patchdir" => "/tmp",
 	"patchurl" => "/",
-	"root" => ""
+	"root" => "",
+	"tar" => "/bin/tar"
 	);
 
 undef $local_arch;
@@ -97,6 +99,8 @@ sub process_download {
 	if ( ! $all_success ) {
 		print "Download summary: there were some failures.\n";
 	}
+
+	return $all_success;
 }
 
 
@@ -106,31 +110,48 @@ sub process_install {
 
 
 sub process_read {
-	print "here we go for read.\n";
+	my $all_success = 1;
 
 	foreach my $token (@ARGV) {
-		#
-		# if the patch is already installed in the db, then skip the download,
-		# unless we are forcing the download
-		#
 		my $installed = &find_installed_patch( $token );
+		my $fetched = find_fetched_file( $token );
+
+		#
+		# if the download is not forced, and the patch is not installed nor
+		# fetched, then force a download of the patch
+		#
+		if ( exists $Cmd_args{force} || ( ! $installed && ! $fetched ) ) {
+			$all_success = &download_token( $token );
+			$fetched = find_fetched_file( $token );
+		}
+
+		#
+		# if the patch is installed (and download is not forced), then read
+		# from the installed patchfile
+		#
 		if ( $installed && ! exists $Cmd_args{force} ) {
-			print "Patch $token is already installed\n";
+			print "Instructions for installed patch $token\n";
+			&read_patchfile( $installed, $token );
 			next;
 		}
 
-		#
-		# if we aren't forcing the download and the file exists, then we can
-		# consider this success
-		#
-		my $dest = find_fetched_file( $token );
-		if ( $dest && ! exists $Cmd_args{force} ) {
-			print "File already exists: $dest\n";
+		# if the patch has been downloaded, then read from the tar blob
+		if ( $fetched ) {
+			print "Instructions for downloaded patch $token\n";
+			&read_extracted_patchfile( $fetched, $token );
 			next;
 		}
 
-		$all_success = &download_token( $token );
+		# if we get this far, we could not read the patchfile from anywhere
+		print "Patch $token could not be found.\n";
+		$all_success = 0;
 	}
+
+	if ( ! $all_success ) {
+		print "Read summary: there were some failures.\n";
+	}
+
+	return $all_success;
 }
 
 
@@ -261,10 +282,45 @@ sub find_installed_patch {
 }
 
 
+sub read_patchfile {
+	my ( $dir, $token ) = @_;
+
+	my ( $patchfile ) = glob("$dir/*.patch");
+	open( PATCHFILE, "<$patchfile" ) or die("Cannot open patchfile $patchfile");
+
+	print "=" x 40 . "\n\n";
+
+	while (<PATCHFILE>) {
+		if ( /^Index:\s.+$/ ) { last; }
+		else { print "$_"; }
+	}
+
+	print "-" x 40 . "\n\n";
+
+	close( PATCHFILE );
+}
+
+
+sub read_extracted_patchfile {
+	my ( $tarfile, $token ) = @_;
+
+	my ( $tempdir ) = 
+		tempdir( "$Options{patchdir}/obpf_readmeXXXXXX", CLEANUP => 1 );
+
+	system( "$Options{tar} xfz $tarfile -C $tempdir */*.patch" );
+	if ( $? >> 8 != 0 ) {
+		die("Cannot extract $tarfile into $tempdir\n$?");
+	}
+ 
+	&read_patchfile( glob("$tempdir/*"), $token );
+}
+
+
 sub parse_opts {
 	GetOptions(  \%Cmd_args, 
-		"help|?", "man", "version", "verbose|v", "force|f", "arch:s", "osrev:s",
-		"kernel:s", "patchdir:s", "patchurl:s", "ftp:s", "root:s", "db:s",
+		"help|?", "man", "version", "verbose|v", "force|f", 
+		"arch:s", "osrev:s", "kernel:s", "patchdir:s", "patchurl:s", "ftp:s", 
+		"root:s", "tar:s", "db:s",
 		"download|d", "install|i", "read|r" ) or pod2usage(2);
 
 	if ( exists $Cmd_args{version} ) {
@@ -399,7 +455,7 @@ forces the download to proceed even if the patch has been previously downloaded.
 
 =item B<--ftp>=I<FILE>
 
-path to the ftp command.
+path to the ftp command. Default is /usr/bin/ftp.
 
 =item B<--help>, B<-?>
 
@@ -430,6 +486,10 @@ can be used.
 =item B<--root>=I<DIR>
 
 sets an alternate root system directory when applying patches
+
+=item B<--tar>=I<FILE>
+
+path to the tar command. Default is /bin/tar.
 
 =item B<--verbose>, B<-v>
 
