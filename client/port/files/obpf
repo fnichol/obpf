@@ -71,6 +71,16 @@ sub process_download {
 	my $all_success = 1;
 
 	foreach my $token (@ARGV) {
+		#
+		# if we aren't forcing the download and the file exists, then we can
+		# consider this success
+		#
+		my $dest = find_fetched_file( $token );
+		if ( $dest && ! exists $Cmd_args{force} ) {
+			print "File already exists: $dest\n";
+			next;
+		}
+
 		$all_success = &download_token( $token );
 	}
 
@@ -135,17 +145,6 @@ sub download_token {
 
 sub get_file {
 	my ( $file, $site, $fetch_str ) = @_;
-
-	#
-	# if we aren't forcing the download and the file exists, then we can
-	# consider this success
-	#
-	my $dest = find_fetched_file( $file );
-	if ( $dest && ! exists $Cmd_args{force} ) {
-		print "File already exists: $dest\n";
-		$Fetched_files{$file} = $dest;
-		return 2;
-	}
 
 	foreach my $guess ( &make_fetch_guess_list($file) ) {
 		my $dest = "$Options{patchdir}/$guess";
