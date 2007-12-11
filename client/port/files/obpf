@@ -72,6 +72,16 @@ sub process_download {
 
 	foreach my $token (@ARGV) {
 		#
+		# if the patch is already installed in the db, then skip the download,
+		# unless we are forcing the download
+		#
+		my $installed = &find_installed_patch( $token );
+		if ( $installed && ! exists $Cmd_args{force} ) {
+			print "Patch $token is already installed\n";
+			next;
+		}
+
+		#
 		# if we aren't forcing the download and the file exists, then we can
 		# consider this success
 		#
@@ -99,13 +109,27 @@ sub process_read {
 	print "here we go for read.\n";
 
 	foreach my $token (@ARGV) {
-		my $install_loc = &find_installed_patch( $token );
-		if ( $install_loc ) {
-			print "Found $token installed at $install_loc\n";
+		#
+		# if the patch is already installed in the db, then skip the download,
+		# unless we are forcing the download
+		#
+		my $installed = &find_installed_patch( $token );
+		if ( $installed && ! exists $Cmd_args{force} ) {
+			print "Patch $token is already installed\n";
+			next;
 		}
-		else {
-			print "$token is not install in $Options{db}\n";
+
+		#
+		# if we aren't forcing the download and the file exists, then we can
+		# consider this success
+		#
+		my $dest = find_fetched_file( $token );
+		if ( $dest && ! exists $Cmd_args{force} ) {
+			print "File already exists: $dest\n";
+			next;
 		}
+
+		$all_success = &download_token( $token );
 	}
 }
 
