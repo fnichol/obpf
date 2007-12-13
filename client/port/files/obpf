@@ -261,6 +261,9 @@ sub install_patch {
 		die("Cannot extract patch from $tarfile into $Options{root}/");
 	}
 
+	mkdir( "$Options{root}$Options{db}" ) 
+		or die("Cannot create database $Options{root}$Options{db}");
+
 	system( "$Options{tar} xfz $tarfile -C $Options{root}$Options{db}" );
 	if ( $? >> 8 != 0 ) {
 		die("Cannot add patch $token into database $Options{root}$Options{db}");
