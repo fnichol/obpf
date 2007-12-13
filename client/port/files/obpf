@@ -272,10 +272,12 @@ sub install_patch {
 
 	# if --backup is yes, then create a backup archive
 	if ( "$Options{backup}" =~ /^yes$/i ) {
+		print "Creating pre-patch backup of patch $token ...\n";
 		&prepatch_backup( &find_installed_patch( $token ), $token );
 	}
 
 	# extract the patch into the system
+	print "Extracting patch $token ...\n";
 	system( "$Options{tar} $args $packfile -C $Options{root}/" );
 	if ( $? >> 8 != 0 ) {
 		die("Cannot extract patch from $tarfile into $Options{root}/");
@@ -283,6 +285,7 @@ sub install_patch {
 
 	# if --pack is no, then destroy the patch archive in the database
 	if ( "$Options{pack}" =~ /^no$/i ) {
+		print "Removing pack.tgz from patch $token in database ...\n";
 		unlink( 
 			glob(&find_installed_patch( $token ) . "/pack.{tgz,tgz.md5}\n") );
 	}
@@ -306,7 +309,7 @@ sub prepatch_backup {
 	while (<PLIST>) { chomp; push( @files, $_ ); }
 	close( PLIST );
 
-	system( "cd $Options{root}; echo $Options{tar} cpfz $db_dir/prepatch.tgz " .
+	system( "cd $Options{root}; $Options{tar} cpfz $db_dir/prepatch.tgz " .
 		join(" ", @files) );
 	if ( $? >> 8 != 0 ) {
 		die("Cannot create backup before installation of $token.");
