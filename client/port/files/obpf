@@ -15,6 +15,7 @@ my $Is_verbose = 0;
 use Getopt::Long;
 use Pod::Usage;
 use File::Basename;
+use File::Copy;
 use File::Temp qw/ tempfile tempdir /;
 use Switch;
 
@@ -318,13 +319,23 @@ sub prepatch_backup {
 	# build list of files to backup based on the patch plist file
 	my ($plist_file) = glob("$db_dir/*.plist");
 	open( PLIST, "<$plist_file" ) or die("Cannot open plist file $plist_file");
-	while (<PLIST>) { chomp; push( @files, $_ ); }
+
+	while (<PLIST>) {
+		chomp;
+		if ( -r "$Options{root}/$_" ) {
+			push( @files, $_ );
+		}
+		else {
+			print ">> File $Options{root}/$_ doesn't exist on system. Skipping for backup.\n"  if ( $Is_verbose );
+		}
+	}
+
 	close( PLIST );
 
 	my $args = "cpfz";
 	if ( $Is_verbose ) { $args .= "v"; }
 
-	system( "cd $Options{root}; $Options{tar} $args $db_dir/prepatch.tgz " .
+	system( "cd $Options{root}/; $Options{tar} $args $db_dir/prepatch.tgz " .
 		join(" ", @files) );
 	if ( $? >> 8 != 0 ) {
 		die("Cannot create backup before installation of $token.");
