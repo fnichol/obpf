@@ -303,7 +303,7 @@ sub prepatch_backup {
 	# build list of files to backup based on the patch plist file
 	my ($plist_file) = glob("$db_dir/*.plist");
 	open( PLIST, "<$plist_file" ) or die("Cannot open plist file $plist_file");
-	while (<PLIST>) { chomp; push( @files ); }
+	while (<PLIST>) { chomp; push( @files, $_ ); }
 	close( PLIST );
 
 	system( "cd $Options{root}; echo $Options{tar} cpfz $db_dir/prepatch.tgz " .
