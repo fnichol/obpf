@@ -354,7 +354,21 @@ sub prepatch_backup {
 sub download_token {
 	my ( $token ) = @_;
 
-	my @sites = split( /\/:/, $Options{patchurl} );
+	my @sites = ();
+
+	if ( $token =~ /^\// ) {
+		@sites = ( dirname($token) );
+		$token = basename( $token );
+	}
+	elsif ( $token =~ /^(http|ftp):\/\// ) {
+		my $site_url = $token;
+		$site_url =~ s/^(.+\/)([^\/]+)$/$1/;
+		$token = $2;
+		@sites = ( $site_url );
+	}
+	else {
+		@sites = split( /\/:/, $Options{patchurl} );
+	}
 
 	foreach my $site (@sites) {
 		# strip out any trailing slash on site
