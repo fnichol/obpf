@@ -109,12 +109,43 @@ sub process_download {
 
 
 sub process_install {
-	print "here we go for install.\n";
+	my $all_success = 1;
 
 	foreach my $token (@ARGV) {
-		my $installed = &find_fetched_file( $token );
-		&verify_tar_md5s( $installed, $token );
+		my $installed = &find_installed_patch( $token );
+		my $fetched = find_fetched_file( $token );
+
+		# if the patch is already installed, then skip
+		if ( $installed ) {
+			print "Patch $token is already installed, skipping.\n";
+			next;
+		}
+
+		#
+		# if the patch is installed (and download is not forced), then read
+		# from the installed patchfile
+		#
+		if ( ! $fetched || exists $Cmd_args{force} ) {
+			$fetched = &download_token( $token );
+		}
+
+		# if the patch has been downloaded, then read from the tar blob
+		if ( $fetched && &verify_tar_md5s( $fetched, $token ) ) {
+			print "Installing patch $token\n";
+			if ( ! &install_patch( $fetched, $token ) ) { $all_success = 0; }
+			next;
+		}
+
+		# if we get this far, we could not determine the patchfile from anywhere
+		print "Patch $token could not be found.\n";
+		$all_success = 0;
 	}
+
+	if ( ! $all_success ) {
+		print "Install summary: there were some failures.\n";
+	}
+
+	return $all_success;
 }
 
 
@@ -209,6 +240,28 @@ sub process_plist {
 	return $all_success;
 }
 
+
+sub install_patch {
+	my ( $tarfile, $token ) = @_;
+
+	my ( $tempdir ) = &extract_temp_tar( $tarfile );
+	my ( $packfile ) = glob("$tempdir/*/pack.tgz");
+
+	my $args = "xpfz";
+	if ( $Is_verbose ) { $args .= "v"; }
+
+	system( "echo $Options{tar} $args $packfile -C $Options{root}/" );
+	if ( $? >> 8 != 0 ) {
+		die("Cannot extract patch from $tarfile into $Options{root}/");
+	}
+
+	system( "echo $Options{tar} xfz $tarfile -C $Options{root}$Options{db}" );
+	if ( $? >> 8 != 0 ) {
+		die("Cannot add patch $token into database $Options{root}$Options{db}");
+	}
+
+	return 1;
+}
 
 sub download_token {
 	my ( $token ) = @_;
@@ -324,8 +377,8 @@ sub find_installed_patch {
 
 	# try to find a previously downloaded version of the $file
 	foreach my $guess ( &make_installed_guess_list($token) ) {
-		if ( -d "$Options{db}/$guess" ) {
-			return "$Options{db}/$guess";
+		if ( -d "$Options{root}$Options{db}/$guess" ) {
+			return "$Options{root}$Options{db}/$guess";
 		}
 	}
 
