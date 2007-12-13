@@ -264,21 +264,21 @@ sub install_patch {
 	my $args = "xpfz";
 	if ( $Is_verbose ) { $args .= "v"; }
 
+	# install the patch info into the database
+	system( "$Options{tar} xfz $tarfile -C $Options{root}$Options{db}" );
+	if ( $? >> 8 != 0 ) {
+		die("Cannot add patch $token into database $Options{root}$Options{db}");
+	}
+
 	# if --backup is yes, then create a backup archive
 	if ( "$Options{backup}" =~ /^yes$/i ) {
-		print "making a backup before $token\n";
+		&prepatch_backup( &find_installed_patch( $token ), $token );
 	}
 
 	# extract the patch into the system
 	system( "$Options{tar} $args $packfile -C $Options{root}/" );
 	if ( $? >> 8 != 0 ) {
 		die("Cannot extract patch from $tarfile into $Options{root}/");
-	}
-
-	# install the patch info into the database
-	system( "$Options{tar} xfz $tarfile -C $Options{root}$Options{db}" );
-	if ( $? >> 8 != 0 ) {
-		die("Cannot add patch $token into database $Options{root}$Options{db}");
 	}
 
 	# if --pack is no, then destroy the patch archive in the database
@@ -293,6 +293,24 @@ sub install_patch {
 	}
 
 	return 1;
+}
+
+
+sub prepatch_backup {
+	my ( $db_dir, $token ) = @_;
+	my @files = ();
+
+	# build list of files to backup based on the patch plist file
+	my ($plist_file) = glob("$db_dir/*.plist");
+	open( PLIST, "<$plist_file" ) or die("Cannot open plist file $plist_file");
+	while (<PLIST>) { chomp; push( @files ); }
+	close( PLIST );
+
+	system( "cd $Options{root}; echo $Options{tar} cpfz $db_dir/prepatch.tgz " .
+		join(" ", @files) );
+	if ( $? >> 8 != 0 ) {
+		die("Cannot create backup before installation of $token.");
+	}
 }
 
 
