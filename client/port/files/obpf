@@ -36,10 +36,12 @@ my $local_osrev = `/usr/bin/uname -r`; chomp $local_osrev;
 # default values for each option
 my %Defaults = (
 	"arch" => , $local_arch,
+	"backup" => "no",
 	"db" => "/var/obpf",
 	"ftp" => "/usr/bin/ftp",
 	"kernel" => , "GENERIC",
 	"md5" => "/bin/md5",
+	"pack" => "yes",
 	"osrev" => $local_osrev,
 	"patchdir" => "/tmp",
 	"patchurl" => "/",
@@ -262,6 +264,11 @@ sub install_patch {
 	my $args = "xpfz";
 	if ( $Is_verbose ) { $args .= "v"; }
 
+	# if --backup is yes, then create a backup archive
+	if ( "$Options{backup}" =~ /^yes$/i ) {
+		print "making a backup before $token\n";
+	}
+
 	# extract the patch into the system
 	system( "$Options{tar} $args $packfile -C $Options{root}/" );
 	if ( $? >> 8 != 0 ) {
@@ -274,12 +281,11 @@ sub install_patch {
 		die("Cannot add patch $token into database $Options{root}$Options{db}");
 	}
 
-	# if --nopack is set, then destroy the patch archive in the database
-	if ( exists $Cmd_args{nopack} ) {
+	# if --pack is no, then destroy the patch archive in the database
+	if ( "$Options{pack}" =~ /^no$/i ) {
 		unlink( 
 			glob(&find_installed_patch( $token ) . "/pack.{tgz,tgz.md5}\n") );
 	}
-
 
 	# check if patch is a kernel patch
 	if ( &plist_contains( glob("$tempdir/*/*.plist"), "./bsd" ) ) {
@@ -542,7 +548,7 @@ sub extract_temp_tar {
 sub show_defaults {
 	print "obpf default options:\n";
 
-	foreach my $option (keys %Defaults) {
+	foreach my $option (sort keys %Defaults) {
 		print "    --$option=$Defaults{$option}\n";
 	}
 
@@ -555,8 +561,8 @@ sub show_defaults {
 sub parse_opts {
 	GetOptions(  \%Cmd_args, 
 		"help|?", "man", "version", "verbose|v", "show-defaults", "force|f", 
-		"nopack", "arch:s", "osrev:s", "kernel:s", "patchdir:s", "patchurl:s", 
-		"ftp:s", "root:s", "tar:s", "db:s", "md5:s",
+		"pack:s", "backup:s", "arch:s", "osrev:s", "kernel:s", "patchdir:s", 
+		"patchurl:s", "ftp:s", "root:s", "tar:s", "db:s", "md5:s",
 		"download|d", "install|i", "read|r", "plist|p" ) or pod2usage(2);
 
 	if ( exists $Cmd_args{version} ) {
@@ -710,6 +716,11 @@ the I<--force> argument.
 
 overrides the system architecture used when fetching patches.
 
+=item B<--backup>=I<yes|no>
+
+determines whether or not to take a backup of the system files to be copied 
+over when installing. The default is I<no>.
+
 =item B<--db>=I<DIR>
 
 root of the obpf database. The default is /var/obpf.
@@ -738,10 +749,10 @@ displays the full manpage for this program
 
 path to the md5 command. Default is /bin/md5.
 
-=item B<--nopack>
+=item B<--pack>=I<yes|no>
 
-does not keep the patch pack.tgz file in the obpf database to save space. The
-default is to perserve this archive in I<db>.
+determines whether or not to keep the patch pack.tgz file in the obpf database 
+to save space when installing. The default is I<yes>.
 
 =item B<--osrev>=I<VER>
 
