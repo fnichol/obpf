@@ -277,6 +277,15 @@ sub install_patch {
 		&prepatch_backup( &find_installed_patch( $token ), $token );
 	}
 
+	# check if patch is a kernel patch
+	if ( &plist_contains( glob("$tempdir/*/*.plist"), "./bsd" ) ) {
+		# perform a sanity backup for alt boot purposes
+		copy( "$Options{root}/bsd", "$Options{root}/bsd.last" );
+
+		# flag this patch as a kernel patch for reporting later
+		$Is_reboot_needed = 1;
+	}
+
 	# extract the patch into the system
 	print "    Extracting patch $token ...\n";
 	system( "$Options{tar} $args $packfile -C $Options{root}/" );
@@ -289,11 +298,6 @@ sub install_patch {
 		print "    Removing pack.tgz from patch $token in database ...\n";
 		unlink( 
 			glob(&find_installed_patch( $token ) . "/pack.{tgz,tgz.md5}\n") );
-	}
-
-	# check if patch is a kernel patch
-	if ( &plist_contains( glob("$tempdir/*/*.plist"), "./bsd" ) ) {
-		$Is_reboot_needed = 1;
 	}
 
 	print "    Patch $token successfully installed.\n";
