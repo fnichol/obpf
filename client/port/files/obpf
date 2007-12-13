@@ -38,6 +38,7 @@ my %Defaults = (
 	"db" => "/var/obpf",
 	"ftp" => "/usr/bin/ftp",
 	"kernel" => , "GENERIC",
+	"md5" => "/bin/md5",
 	"osrev" => $local_osrev,
 	"patchdir" => "/tmp",
 	"patchurl" => "/",
@@ -93,7 +94,9 @@ sub process_download {
 			next;
 		}
 
-		$all_success = &download_token( $token );
+		if ( ! &download_token( $token ) ) {
+			$all_success = 0;
+		}
 	}
 
 	if ( ! $all_success ) {
@@ -106,6 +109,11 @@ sub process_download {
 
 sub process_install {
 	print "here we go for install.\n";
+
+	foreach my $token (@ARGV) {
+		my $installed = &find_fetched_file( $token );
+		&verify_md5_hashes( $installed, $token );
+	}
 }
 
 
@@ -121,8 +129,7 @@ sub process_read {
 		# fetched, then force a download of the patch
 		#
 		if ( exists $Cmd_args{force} || ( ! $installed && ! $fetched ) ) {
-			$all_success = &download_token( $token );
-			$fetched = find_fetched_file( $token );
+			$fetched = &download_token( $token );
 		}
 
 		#
@@ -165,26 +172,24 @@ sub download_token {
 		$site =~ s/^(.+)\/$/$1/;
 
 		my $fetch_success = 0;
+		my $tarfile = "";
 		if ( $site =~ /^\// ) {
-			$fetch_success = \
+			$tarfile = 
 				&get_file( $token, $site, "/bin/cp #SOURCE# #DEST#" );
 		}
 		else {
-			$fetch_success = 
+			$tarfile = 
 				&get_file( $token, $site, "$Options{ftp} -V -m #SOURCE#" );
 		}
 
-		if ( $fetch_success == 1 ) {
+		if ( $tarfile ) {
 			print "Patch $token download success.\n";
-		}
-
-		if ( $fetch_success ) {
-			return $fetch_success;
+			return $tarfile;
 		}
 	}
 
 	print "Patch $token download not successful.\n";
-	return 0;
+	return undef;
 }
 
 
@@ -206,13 +211,12 @@ sub get_file {
 
 		# if the exit value of the fetch command was 0, then success
 		if ( $? >> 8 == 0 ) {
-			$Fetched_files{$file} = $dest;
-			return 1;
+			return $dest;
 		}
 	}
 
 	# if all attempts have failed, then return false
-	return 0;
+	return undef;
 }
 
 
@@ -304,15 +308,52 @@ sub read_patchfile {
 sub read_extracted_patchfile {
 	my ( $tarfile, $token ) = @_;
 
-	my ( $tempdir ) = 
-		tempdir( "$Options{patchdir}/obpf_readmeXXXXXX", CLEANUP => 1 );
+	my ( $tempdir ) = &extract_temp_tar( $tarfile );
 
-	system( "$Options{tar} xfz $tarfile -C $tempdir */*.patch" );
-	if ( $? >> 8 != 0 ) {
-		die("Cannot extract $tarfile into $tempdir\n$?");
-	}
- 
 	&read_patchfile( glob("$tempdir/*"), $token );
+}
+
+
+sub verify_md5_hashes {
+	my ( $tarfile, $token ) = @_;
+
+	my ( $tempdir ) = &extract_temp_tar( $tarfile );
+
+	my $quiet = "";
+	if ( ! $Is_verbose ) {
+		$quiet = "-q";
+	}
+
+	print ">> Checking hash integrity of $token ...\n"  if ( $Is_verbose );
+
+	system( "cd $tempdir/* && md5 $quiet -c *.md5" );
+	if ( $? >> 8 != 0 ) {
+		die("One of the hashes in $token could not be properly verified.");
+	}
+	elsif ( $? >> 8 == 0 && $Is_verbose ) {
+		print ">> Hash integrity has passed for $token.\n";
+	}
+	elsif ( $? >> 8 == 0 ) {
+		return 0;
+	}
+	else {
+		return undef;
+	}
+}
+
+
+sub extract_temp_tar {
+	my ( $tarfile ) = @_;
+
+	my ( $tempdir ) = 
+		tempdir( "$Options{patchdir}/obpf_tempXXXXXX", CLEANUP => 1 );
+
+	system( "$Options{tar} xfz $tarfile -C $tempdir" );
+	if ( $? >> 8 != 0 ) {
+		die("Cannot extract $tarfile into $tempdir");
+	}
+
+	return $tempdir;
 }
 
 
@@ -320,7 +361,7 @@ sub parse_opts {
 	GetOptions(  \%Cmd_args, 
 		"help|?", "man", "version", "verbose|v", "force|f", 
 		"arch:s", "osrev:s", "kernel:s", "patchdir:s", "patchurl:s", "ftp:s", 
-		"root:s", "tar:s", "db:s",
+		"root:s", "tar:s", "db:s", "md5:s",
 		"download|d", "install|i", "read|r" ) or pod2usage(2);
 
 	if ( exists $Cmd_args{version} ) {
@@ -468,6 +509,10 @@ sets the kernel configuration of the patch to download. Default is GENERIC.
 =item B<--man>
 
 displays the full manpage for this program
+
+=item B<--md5>=I<FILE>
+
+path to the md5 command. Default is /bin/md5.
 
 =item B<--osrev>=I<VER>
 
