@@ -539,11 +539,24 @@ sub extract_temp_tar {
 }
 
 
+sub show_defaults {
+	print "obpf default options:\n";
+
+	foreach my $option (keys %Defaults) {
+		print "    --$option=$Defaults{$option}\n";
+	}
+
+	print "\nFor more information, use obpf --man\n";
+
+	exit 0;
+}
+
+
 sub parse_opts {
 	GetOptions(  \%Cmd_args, 
-		"help|?", "man", "version", "verbose|v", "force|f", "nopack",
-		"arch:s", "osrev:s", "kernel:s", "patchdir:s", "patchurl:s", "ftp:s", 
-		"root:s", "tar:s", "db:s", "md5:s",
+		"help|?", "man", "version", "verbose|v", "show-defaults", "force|f", 
+		"nopack", "arch:s", "osrev:s", "kernel:s", "patchdir:s", "patchurl:s", 
+		"ftp:s", "root:s", "tar:s", "db:s", "md5:s",
 		"download|d", "install|i", "read|r", "plist|p" ) or pod2usage(2);
 
 	if ( exists $Cmd_args{version} ) {
@@ -558,6 +571,8 @@ sub parse_opts {
 
 	# prints a manpage if --man option is specified
 	pod2usage( -verbose => 2 )  if ( exists $Cmd_args{man} );
+
+	&show_defaults()  if ( exists $Cmd_args{"show-defaults"} );
 
 	# load in actions into options
 	my $num_actions = 0;
@@ -745,6 +760,10 @@ can be used.
 =item B<--root>=I<DIR>
 
 sets an alternate root system directory when applying patches
+
+=item B<--show-defaults>=I<DIR>
+
+prints all default values of options that can be overridden
 
 =item B<--tar>=I<FILE>
 
