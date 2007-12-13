@@ -280,6 +280,9 @@ sub install_patch {
 	# check if patch is a kernel patch
 	if ( &plist_contains( glob("$tempdir/*/*.plist"), "./bsd" ) ) {
 		if ( ! $Is_reboot_needed ) {
+			if ( $Is_verbose ) {
+				print ">> Performing initial sanity backup of $Options{root}/bsd\n"
+			}
 			# perform a sanity backup for alt boot purposes only the first time
 			copy( "$Options{root}/bsd", "$Options{root}/bsd.last" );
 		}
