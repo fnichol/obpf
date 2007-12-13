@@ -254,6 +254,7 @@ sub install_patch {
 
 	# try to create the database dir
 	if ( ! -d "$Options{root}$Options{db}" ) {
+		print "    Creating obpf database at: $Options{root}$Options{db} ...\n";
 		mkdir( "$Options{root}$Options{db}" ) 
 			or die("Cannot create database $Options{root}$Options{db}");
 	}
@@ -272,12 +273,12 @@ sub install_patch {
 
 	# if --backup is yes, then create a backup archive
 	if ( "$Options{backup}" =~ /^yes$/i ) {
-		print "Creating pre-patch backup of patch $token ...\n";
+		print "    Creating pre-patch backup of patch $token ...\n";
 		&prepatch_backup( &find_installed_patch( $token ), $token );
 	}
 
 	# extract the patch into the system
-	print "Extracting patch $token ...\n";
+	print "    Extracting patch $token ...\n";
 	system( "$Options{tar} $args $packfile -C $Options{root}/" );
 	if ( $? >> 8 != 0 ) {
 		die("Cannot extract patch from $tarfile into $Options{root}/");
@@ -285,7 +286,7 @@ sub install_patch {
 
 	# if --pack is no, then destroy the patch archive in the database
 	if ( "$Options{pack}" =~ /^no$/i ) {
-		print "Removing pack.tgz from patch $token in database ...\n";
+		print "    Removing pack.tgz from patch $token in database ...\n";
 		unlink( 
 			glob(&find_installed_patch( $token ) . "/pack.{tgz,tgz.md5}\n") );
 	}
@@ -295,7 +296,7 @@ sub install_patch {
 		$Is_reboot_needed = 1;
 	}
 
-	print "Patch $token successfully installed.\n";
+	print "    Patch $token successfully installed.\n";
 
 	return 1;
 }
