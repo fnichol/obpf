@@ -312,7 +312,10 @@ sub prepatch_backup {
 	while (<PLIST>) { chomp; push( @files, $_ ); }
 	close( PLIST );
 
-	system( "cd $Options{root}; $Options{tar} cpfz $db_dir/prepatch.tgz " .
+	my $args = "cpfz";
+	if ( $Is_verbose ) { $args .= "v"; }
+
+	system( "cd $Options{root}; $Options{tar} $args $db_dir/prepatch.tgz " .
 		join(" ", @files) );
 	if ( $? >> 8 != 0 ) {
 		die("Cannot create backup before installation of $token.");
