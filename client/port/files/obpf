@@ -59,7 +59,7 @@ my @CONF_LOCATIONS = ( dirname($0)."/obpf.conf", $ENV{HOME}."/.obpf",
 # prefix of option environment variables
 my $ENV_PREFIX = "OBPF_";
 
-my @ACTIONS = ( "download", "install", "read", "plist" );
+my @ACTIONS = ( "download", "install", "read", "plist", "show-installed" );
 
 
 MAIN: {
@@ -587,9 +587,10 @@ sub show_defaults {
 
 sub parse_opts {
 	GetOptions(  \%Cmd_args, 
-		"help|?", "man", "version", "verbose|v", "show-defaults", "force|f", 
-		"pack:s", "backup:s", "arch:s", "osrev:s", "kernel:s", "patchdir:s", 
-		"patchurl:s", "ftp:s", "root:s", "tar:s", "db:s", "md5:s",
+		"help|?", "man", "version", "verbose|v", "show-defaults", 
+		"show-installed", "force|f", "pack:s", "backup:s", "arch:s", 
+		"osrev:s", "kernel:s", "patchdir:s", "patchurl:s", "ftp:s", "root:s", 
+		"tar:s", "db:s", "md5:s",
 		"download|d", "install|i", "read|r", "plist|p" ) or pod2usage(2);
 
 	if ( exists $Cmd_args{version} ) {
@@ -651,6 +652,8 @@ sub parse_opts {
 	}
 
 	print "========================\n\n"  if ( $Is_verbose );
+
+	&show_installed_patches()  if ( exists $Cmd_args{"show-installed"} );
 }
 
 
@@ -673,6 +676,17 @@ sub parse_config_files {
 	}
 }
 
+sub show_installed_patches {
+	opendir( DIR, "$Options{root}$Options{db}" ) 
+		or die("obpf database does not exist at $Options{root}$Options{db}");
+
+	print "The following opbf patches are installed:\n";
+	foreach my $patch (sort readdir( DIR )) {
+		if ( $patch !~ /^\.\.?$/ ) { print "$patch\n"; }
+	}
+
+	closedir( DIR );
+}
 
 sub plist_contains {
 	my ( $file, $line ) = @_;
@@ -799,9 +813,13 @@ can be used.
 
 sets an alternate root system directory when applying patches
 
-=item B<--show-defaults>=I<DIR>
+=item B<--show-defaults>
 
 prints all default values of options that can be overridden
+
+=item B<--show-installed>
+
+prints all installed patches. See I<--db>.
 
 =item B<--tar>=I<FILE>
 
