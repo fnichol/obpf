@@ -274,8 +274,10 @@ sub install_patch {
 		die("Cannot add patch $token into database $Options{root}$Options{db}");
 	}
 
+	# if --nopack is set, then destroy the patch archive in the database
 	if ( exists $Cmd_args{nopack} ) {
-		print &find_installed_patch( $token ) . "/pack.tgz*\n";
+		unlink( 
+			glob(&find_installed_patch( $token ) . "/pack.{tgz,tgz.md5}\n") );
 	}
 
 
