@@ -250,23 +250,32 @@ sub process_plist {
 sub install_patch {
 	my ( $tarfile, $token ) = @_;
 
+	# try to create the database dir
+	if ( ! -d "$Options{root}$Options{db}" ) {
+		mkdir( "$Options{root}$Options{db}" ) 
+			or die("Cannot create database $Options{root}$Options{db}");
+	}
+
 	my ( $tempdir ) = &extract_temp_tar( $tarfile );
 	my ( $packfile ) = glob("$tempdir/*/pack.tgz");
 
 	my $args = "xpfz";
 	if ( $Is_verbose ) { $args .= "v"; }
 
+	# extract the patch into the system
 	system( "$Options{tar} $args $packfile -C $Options{root}/" );
 	if ( $? >> 8 != 0 ) {
 		die("Cannot extract patch from $tarfile into $Options{root}/");
 	}
 
-	mkdir( "$Options{root}$Options{db}" ) 
-		or die("Cannot create database $Options{root}$Options{db}");
-
+	# install the patch info into the database
 	system( "$Options{tar} xfz $tarfile -C $Options{root}$Options{db}" );
 	if ( $? >> 8 != 0 ) {
 		die("Cannot add patch $token into database $Options{root}$Options{db}");
+	}
+
+	if ( exists $Cmd_args{nopack} ) {
+		print &find_installed_patch( $token ) . "/pack.tgz*\n";
 	}
 
 
@@ -530,7 +539,7 @@ sub extract_temp_tar {
 
 sub parse_opts {
 	GetOptions(  \%Cmd_args, 
-		"help|?", "man", "version", "verbose|v", "force|f", 
+		"help|?", "man", "version", "verbose|v", "force|f", "nopack",
 		"arch:s", "osrev:s", "kernel:s", "patchdir:s", "patchurl:s", "ftp:s", 
 		"root:s", "tar:s", "db:s", "md5:s",
 		"download|d", "install|i", "read|r", "plist|p" ) or pod2usage(2);
@@ -711,6 +720,11 @@ displays the full manpage for this program
 =item B<--md5>=I<FILE>
 
 path to the md5 command. Default is /bin/md5.
+
+=item B<--nopack>
+
+does not keep the patch pack.tgz file in the obpf database to save space. The
+default is to perserve this archive in I<db>.
 
 =item B<--osrev>=I<VER>
 
