@@ -275,7 +275,7 @@ sub install_patch {
 				( "$Options{pack}" =~ /^no$/i && $file =~ /pack\.tgz/ ) ) {
 			push( @db_files, $file );
 		}
-		else {
+		elsif ( $file =~ /\// ) {
 			print ">> Skipping database extraction of $file\n" if ($Is_verbose);
 		}
 	}
