@@ -113,7 +113,7 @@ sub process_install {
 
 	foreach my $token (@ARGV) {
 		my $installed = &find_fetched_file( $token );
-		&verify_md5_hashes( $installed, $token );
+		&verify_tar_md5s( $installed, $token );
 	}
 }
 
@@ -137,14 +137,15 @@ sub process_read {
 		# if the patch is installed (and download is not forced), then read
 		# from the installed patchfile
 		#
-		if ( $installed && ! exists $Cmd_args{force} ) {
+		if ( $installed && &verify_installed_md5s( $token ) &&
+				! exists $Cmd_args{force} ) {
 			print "Instructions for installed patch $token\n";
 			&read_patchfile( $installed, $token );
 			next;
 		}
 
 		# if the patch has been downloaded, then read from the tar blob
-		if ( $fetched ) {
+		if ( $fetched && &verify_tar_md5s( $fetched, $token ) ) {
 			print "Instructions for downloaded patch $token\n";
 			&read_extracted_patchfile( $fetched, $token );
 			next;
@@ -182,14 +183,15 @@ sub process_plist {
 		# if the patch is installed (and download is not forced), then read
 		# from the installed patchfile
 		#
-		if ( $installed && ! exists $Cmd_args{force} ) {
+		if ( $installed && &verify_installed_md5s( $token ) && 
+				! exists $Cmd_args{force} ) {
 			print "Plist for installed patch $token\n";
 			&read_plist( $installed, $token );
 			next;
 		}
 
 		# if the patch has been downloaded, then read from the tar blob
-		if ( $fetched ) {
+		if ( $fetched && &verify_tar_md5s( $fetched, $token ) ) {
 			print "Plist for downloaded patch $token\n";
 			&read_extracted_plist( $fetched, $token );
 			next;
@@ -385,7 +387,37 @@ sub read_extracted_plist {
 }
 
 
-sub verify_md5_hashes {
+sub verify_installed_md5s {
+	my ( $token ) = @_;
+
+	my $installed = &find_installed_patch( $token );
+	if ( ! $installed ) { 
+		die("The patch $token is not installed and cannot be verified.");
+	}
+
+	my $quiet = "";
+	if ( ! $Is_verbose ) {
+		$quiet = "-q";
+	}
+
+	print ">> Checking hash integrity of $token ...\n"  if ( $Is_verbose );
+
+	system( "cd $installed && md5 $quiet -c *.md5" );
+	if ( $? >> 8 != 0 ) {
+		die("One of the hashes in $token could not be properly verified.");
+	}
+
+	if ( $? >> 8 == 0 ) {
+		print ">> Hash integrity has passed for $token.\n"  if ( $Is_verbose );
+		return 1;
+	}
+	else {
+		return undef;
+	}
+}
+
+
+sub verify_tar_md5s {
 	my ( $tarfile, $token ) = @_;
 
 	my ( $tempdir ) = &extract_temp_tar( $tarfile );
@@ -401,11 +433,10 @@ sub verify_md5_hashes {
 	if ( $? >> 8 != 0 ) {
 		die("One of the hashes in $token could not be properly verified.");
 	}
-	elsif ( $? >> 8 == 0 && $Is_verbose ) {
-		print ">> Hash integrity has passed for $token.\n";
-	}
-	elsif ( $? >> 8 == 0 ) {
-		return 0;
+
+	if ( $? >> 8 == 0 ) {
+		print ">> Hash integrity has passed for $token.\n"  if ( $Is_verbose );
+		return 1;
 	}
 	else {
 		return undef;
