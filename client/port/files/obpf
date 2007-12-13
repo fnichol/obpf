@@ -27,7 +27,8 @@ my %Conf_opts = ();
 # final options hash
 my %Options = ();
 
-my %Fetched_files = ();
+# is a reboot required after install (is there a kernel patch involved)?
+my $Is_reboot_needed = 0;
 
 my $local_arch = `/usr/bin/uname -m`; chomp $local_arch;
 my $local_osrev = `/usr/bin/uname -r`; chomp $local_osrev;
@@ -145,6 +146,11 @@ sub process_install {
 		print "Install summary: there were some failures.\n";
 	}
 
+	if ( $Is_reboot_needed ) {
+		print "\nOne or more of these patches was a kernel patch.\n";
+		print "Please restart the system for the patch to take effect.\n";
+	}
+
 	return $all_success;
 }
 
@@ -250,18 +256,25 @@ sub install_patch {
 	my $args = "xpfz";
 	if ( $Is_verbose ) { $args .= "v"; }
 
-	system( "echo $Options{tar} $args $packfile -C $Options{root}/" );
+	system( "$Options{tar} $args $packfile -C $Options{root}/" );
 	if ( $? >> 8 != 0 ) {
 		die("Cannot extract patch from $tarfile into $Options{root}/");
 	}
 
-	system( "echo $Options{tar} xfz $tarfile -C $Options{root}$Options{db}" );
+	system( "$Options{tar} xfz $tarfile -C $Options{root}$Options{db}" );
 	if ( $? >> 8 != 0 ) {
 		die("Cannot add patch $token into database $Options{root}$Options{db}");
 	}
 
+
+	# check if patch is a kernel patch
+	if ( &plist_contains( glob("$tempdir/*/*.plist"), "./bsd" ) ) {
+		$Is_reboot_needed = 1;
+	}
+
 	return 1;
 }
+
 
 sub download_token {
 	my ( $token ) = @_;
@@ -598,6 +611,23 @@ sub parse_config_files {
 	}
 }
 
+
+sub plist_contains {
+	my ( $file, $line ) = @_;
+
+	open( FILE, "<$file" ) or die("Cannot open $file for file_contains()");
+	while (<FILE>) {
+		chomp;
+		if ( /^$line$/ ) {
+			close( FILE );
+			return 1;
+		}
+	}
+
+	# if we get this far, we didn't match $regex
+	close( FILE );
+	return undef;
+}
 
 __END__
 
