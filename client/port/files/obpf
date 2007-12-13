@@ -295,6 +295,8 @@ sub install_patch {
 		$Is_reboot_needed = 1;
 	}
 
+	print "Patch $token successfully installed.\n";
+
 	return 1;
 }
 
