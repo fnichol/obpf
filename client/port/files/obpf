@@ -56,7 +56,7 @@ my @CONF_LOCATIONS = ( dirname($0)."/obpf.conf", $ENV{HOME}."/.obpf",
 # prefix of option environment variables
 my $ENV_PREFIX = "OBPF_";
 
-my @ACTIONS = ( "download", "install", "read" );
+my @ACTIONS = ( "download", "install", "read", "plist" );
 
 
 MAIN: {
@@ -66,6 +66,7 @@ MAIN: {
 		case /^download$/ { &process_download(); }
 		case /^install$/ { &process_install(); }
 		case /^read$/ { &process_read(); }
+		case /^plist$/ { &process_plist(); }
 	}
 }
 
@@ -156,6 +157,51 @@ sub process_read {
 
 	if ( ! $all_success ) {
 		print "Read summary: there were some failures.\n";
+	}
+
+	return $all_success;
+}
+
+
+sub process_plist {
+	my $all_success = 1;
+
+	foreach my $token (@ARGV) {
+		my $installed = &find_installed_patch( $token );
+		my $fetched = find_fetched_file( $token );
+
+		#
+		# if the download is not forced, and the patch is not installed nor
+		# fetched, then force a download of the patch
+		#
+		if ( exists $Cmd_args{force} || ( ! $installed && ! $fetched ) ) {
+			$fetched = &download_token( $token );
+		}
+
+		#
+		# if the patch is installed (and download is not forced), then read
+		# from the installed patchfile
+		#
+		if ( $installed && ! exists $Cmd_args{force} ) {
+			print "Plist for installed patch $token\n";
+			&read_plist( $installed, $token );
+			next;
+		}
+
+		# if the patch has been downloaded, then read from the tar blob
+		if ( $fetched ) {
+			print "Plist for downloaded patch $token\n";
+			&read_extracted_plist( $fetched, $token );
+			next;
+		}
+
+		# if we get this far, we could not read the patchfile from anywhere
+		print "Patch $token could not be found.\n";
+		$all_success = 0;
+	}
+
+	if ( ! $all_success ) {
+		print "Plist summary: there were some failures.\n";
 	}
 
 	return $all_success;
@@ -305,12 +351,37 @@ sub read_patchfile {
 }
 
 
+sub read_plist {
+	my ( $dir, $token ) = @_;
+
+	my ( $plist ) = glob("$dir/*.plist");
+	open( PLIST, "<$plist" ) or die("Cannot open plist $plist");
+
+	print "=" x 40 . "\n\n";
+
+	while (<PLIST>) { print; } 
+
+	print "-" x 40 . "\n\n";
+
+	close( PLIST );
+}
+
+
 sub read_extracted_patchfile {
 	my ( $tarfile, $token ) = @_;
 
 	my ( $tempdir ) = &extract_temp_tar( $tarfile );
 
 	&read_patchfile( glob("$tempdir/*"), $token );
+}
+
+
+sub read_extracted_plist {
+	my ( $tarfile, $token ) = @_;
+
+	my ( $tempdir ) = &extract_temp_tar( $tarfile );
+
+	&read_plist( glob("$tempdir/*"), $token );
 }
 
 
@@ -362,7 +433,7 @@ sub parse_opts {
 		"help|?", "man", "version", "verbose|v", "force|f", 
 		"arch:s", "osrev:s", "kernel:s", "patchdir:s", "patchurl:s", "ftp:s", 
 		"root:s", "tar:s", "db:s", "md5:s",
-		"download|d", "install|i", "read|r" ) or pod2usage(2);
+		"download|d", "install|i", "read|r", "plist|p" ) or pod2usage(2);
 
 	if ( exists $Cmd_args{version} ) {
 		print "obpf version $Version.\n";
@@ -474,7 +545,17 @@ I<patchdir>, if set.
 
 =item B<--read>, B<-r>
 
-sets the directory to which patches are downloaded. The default is /tmp.
+displays the patch readme section. The readme is read from the patchfile of
+the installed patch, a previously downloaded patch, or a freshly downloaded
+patch depending on the context. To force an up-to-date readme, see 
+the I<--force> argument.
+
+=item B<--plist>, B<-p>
+
+displays the patch plist file. The plist is read from the plist file of
+the installed patch, a previously downloaded patch, or a freshly downloaded
+patch depending on the context. To force an up-to-date plist, see 
+the I<--force> argument.
 
 =back
 
