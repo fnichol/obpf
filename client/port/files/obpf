@@ -791,6 +791,11 @@ sub download_index {
 	my @sites = split( /\/:/, $Options{patchurl} );
 
 	my $index;
+
+	if ( ! exists $Cmd_args{force} && -r "$Options{patchdir}/index.txt" ) {
+		return "$Options{patchdir}/index.txt";
+	}
+
 	foreach my $site (@sites) {
 		# strip out any trailing slash on site
 		$site =~ s/^(.+)\/$/$1/;
@@ -799,7 +804,10 @@ sub download_index {
 		unless ( $site =~ /^\// ) {
 			$index = &get_file( "index.txt", $site, $REMOTE_FETCH );
 		}
-		if ( $index ) { return $index; }
+		if ( $index ) { 
+			print "Successfully fetched a local copy of index.txt to cache.\n";
+			return $index;
+		}
 	}
 
 	if ( ! $index ) {
