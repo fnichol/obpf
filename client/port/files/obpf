@@ -85,7 +85,7 @@ MAIN: {
 sub process_download {
 	my $all_success = 1;
 
-	foreach my $token (@ARGV) {
+	foreach my $token ( &parse_tokens() ) {
 		#
 		# if the patch is already installed in the db, then skip the download,
 		# unless we are forcing the download
@@ -122,7 +122,7 @@ sub process_download {
 sub process_install {
 	my $all_success = 1;
 
-	foreach my $token (@ARGV) {
+	foreach my $token ( &parse_tokens() ) {
 		my $installed = &find_installed_patch( $token );
 		my $fetched = find_fetched_file( $token );
 
