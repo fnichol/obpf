@@ -60,17 +60,24 @@ my @CONF_LOCATIONS = ( dirname($0)."/obpf.conf", $ENV{HOME}."/.obpf",
 # prefix of option environment variables
 my $ENV_PREFIX = "OBPF_";
 
-my @ACTIONS = ( "download", "install", "read", "plist", "show-installed" );
+my $REMOTE_FETCH = "";
+my $LOCAL_FETCH = "";
+
+my @ACTIONS = ( "download", "install", "read", "plist", "list" );
 
 
 MAIN: {
 	&parse_opts();
+
+	$REMOTE_FETCH = "$Options{ftp} -V -m #SOURCE#";
+	$LOCAL_FETCH = "/bin/cp #SOURCE# #DEST#";
 
 	switch ($Options{action}) {
 		case /^download$/ { &process_download(); }
 		case /^install$/ { &process_install(); }
 		case /^read$/ { &process_read(); }
 		case /^plist$/ { &process_plist(); }
+		case /^list$/ { &process_list(); }
 	}
 }
 
@@ -161,7 +168,7 @@ sub process_install {
 sub process_read {
 	my $all_success = 1;
 
-	foreach my $token (@ARGV) {
+	foreach my $token ( &parse_tokens() ) {
 		my $installed = &find_installed_patch( $token );
 		my $fetched = find_fetched_file( $token );
 
@@ -207,7 +214,7 @@ sub process_read {
 sub process_plist {
 	my $all_success = 1;
 
-	foreach my $token (@ARGV) {
+	foreach my $token ( &parse_tokens() ) {
 		my $installed = &find_installed_patch( $token );
 		my $fetched = find_fetched_file( $token );
 
@@ -247,6 +254,26 @@ sub process_plist {
 	}
 
 	return $all_success;
+}
+
+
+sub process_list {
+	switch ( $ARGV[0] ) {
+		case /^installed$/ { 
+			print "The following opbf patches are installed:\n";
+		}
+		case /^missing$/ {
+			print "The following opbf patches are not yet installed:\n";
+		}
+		case /^all$/ {
+			print "The following opbf patches found for release " . 
+				"$Options{osrev}/$Options{arch}:\n";
+		}
+	}
+
+	foreach my $patch ( &parse_tokens() ) {
+		print "$patch\n";
+	}
 }
 
 
@@ -378,11 +405,11 @@ sub download_token {
 		my $tarfile = "";
 		if ( $site =~ /^\// ) {
 			$tarfile = 
-				&get_file( $token, $site, "/bin/cp #SOURCE# #DEST#" );
+				&get_file_from_guesses( $token, $site, $LOCAL_FETCH );
 		}
 		else {
 			$tarfile = 
-				&get_file( $token, $site, "$Options{ftp} -V -m #SOURCE#" );
+				&get_file_from_guesses( $token, $site, $REMOTE_FETCH );
 		}
 
 		if ( $tarfile ) {
@@ -396,30 +423,40 @@ sub download_token {
 }
 
 
-sub get_file {
+sub get_file_from_guesses {
 	my ( $file, $site, $fetch_str ) = @_;
 
 	foreach my $guess ( &make_fetch_guess_list($file) ) {
-		my $dest = "$Options{patchdir}/$guess";
-
-		# determine the final fetch command to be executed
-		my $fetch_cmd = $fetch_str;
-		$fetch_cmd =~ s/#SOURCE#/$site\/$guess/g;
-		$fetch_cmd =~ s/#DEST#/$dest/g;
-
-		print "Trying $site/$guess ...\n";
-
-		# run the command to fetch the file
-		system( "cd $Options{patchdir}; $fetch_cmd" );
-
-		# if the exit value of the fetch command was 0, then success
-		if ( $? >> 8 == 0 ) {
-			return $dest;
-		}
+		my $dest = &get_file( $guess, $site, $fetch_str );
+		if ( $dest ) { return $dest; }
 	}
 
 	# if all attempts have failed, then return false
 	return undef;
+}
+
+sub get_file {
+	my ( $file, $site, $fetch_str ) = @_;
+
+	my $dest = "$Options{patchdir}/$file";
+
+	# determine the final fetch command to be executed
+	my $fetch_cmd = $fetch_str;
+	$fetch_cmd =~ s/#SOURCE#/$site\/$file/g;
+	$fetch_cmd =~ s/#DEST#/$dest/g;
+
+	print "Trying $site/$file ...\n";
+
+	# run the command to fetch the file
+	system( "cd $Options{patchdir}; $fetch_cmd" );
+
+	# if the exit value of the fetch command was 0, then success
+	if ( $? >> 8 == 0 ) {
+		return $dest;
+	}
+	else {
+		return undef;
+	}
 }
 
 
@@ -630,10 +667,11 @@ sub show_defaults {
 sub parse_opts {
 	GetOptions(  \%Cmd_args, 
 		"help|?", "man", "version", "verbose|v", "show-defaults", 
-		"show-installed", "force|f", "pack:s", "backup:s", "arch:s", 
+		"force|f", "pack:s", "backup:s", "arch:s", 
 		"osrev:s", "kernel:s", "patchdir:s", "patchurl:s", "ftp:s", "root:s", 
 		"tar:s", "db:s", "md5:s",
-		"download|d", "install|i", "read|r", "plist|p" ) or pod2usage(2);
+		"download|d", "install|i", "read|r", "plist|p", "list|l" ) 
+		or pod2usage(2);
 
 	if ( exists $Cmd_args{version} ) {
 		print "obpf version $Version.\n";
@@ -695,7 +733,13 @@ sub parse_opts {
 
 	print "========================\n\n"  if ( $Is_verbose );
 
-	&show_installed_patches()  if ( exists $Cmd_args{"show-installed"} );
+	# check to make sure that a valid list action is called for
+	if ( $Options{action} =~ /^list$/ ) {
+		unless ( $#ARGV+1 == 1  && $ARGV[0] =~ /(installed|missing|all)/ ) {
+			pod2usage("$0: list action may only be single token keyword:\n" .
+				"    installed | missing | all" );
+		}
+	}
 }
 
 
@@ -718,17 +762,92 @@ sub parse_config_files {
 	}
 }
 
-sub show_installed_patches {
+
+sub parse_tokens {
+	if ( $#ARGV+1 == 1 && $ARGV[0] =~ /^installed$/ ) {
+		return &parse_db_dir();
+	}
+	elsif ( $#ARGV+1 == 1 && $ARGV[0] =~ /^all$/ ) {
+		return &parse_index_file( &download_index() );
+	}
+	elsif ( $#ARGV+1 == 1 && $ARGV[0] =~ /^missing$/ ) {
+		my @installed_patches = &parse_db_dir();
+		my @missing_patches = ();
+
+		foreach my $patch ( &parse_index_file( &download_index() ) ) {
+			if ( ! grep(/^$patch$/, @installed_patches) )  {
+				push( @missing_patches, $patch );
+			}
+		}
+		return @missing_patches;
+	}
+	else {
+		return @ARGV;
+	}
+}
+
+
+sub download_index {
+	my @sites = split( /\/:/, $Options{patchurl} );
+
+	my $index;
+	foreach my $site (@sites) {
+		# strip out any trailing slash on site
+		$site =~ s/^(.+)\/$/$1/;
+		$index = "";
+
+		unless ( $site =~ /^\// ) {
+			$index = &get_file( "index.txt", $site, $REMOTE_FETCH );
+		}
+		if ( $index ) { return $index; }
+	}
+
+	if ( ! $index ) {
+		die "Remote index.txt file could not be found in any remote site.\n";
+	}
+
+}
+
+
+sub parse_db_dir {
+	my @patches = ();
+
 	opendir( DIR, "$Options{root}$Options{db}" ) 
 		or die("obpf database does not exist at $Options{root}$Options{db}");
 
-	print "The following opbf patches are installed:\n";
 	foreach my $patch (sort readdir( DIR )) {
-		if ( $patch !~ /^\.\.?$/ ) { print "$patch\n"; }
+		if ( $patch !~ /^\.\.?$/ ) { push( @patches, $patch ); }
 	}
 
 	closedir( DIR );
+
+	return sort @patches;
 }
+
+
+sub parse_index_file {
+	my ( $index ) = @_;
+
+	open( INDEX, "<$index" ) or die("Cannot open local index.txt file $index");
+
+	my @patches = ();
+
+	while (<INDEX>) {
+		chomp;
+		if ( /^obpf-\d\.\d-[^-]+-(\d{3}_[^-]+-(.+))\.tgz$/ && 
+				$Options{kernel} eq "$2") {
+			push( @patches, $1 );
+		}
+		elsif ( /^obpf-\d.\d-[^-]+-(\d{3}_[^-]+)\.tgz$/ ) {
+			push( @patches, $1 );
+		}
+	}
+
+	close( INDEX );
+
+	return sort @patches;
+}
+
 
 sub plist_contains {
 	my ( $file, $line ) = @_;
@@ -769,27 +888,38 @@ B<obpf> .
 =item B<--download>, B<-d>
 
 downloads patches. Patches are downloaded to /tmp or to I<patchdir>, if set.
+See I<TOKENS> on how to specify which patches are downloaded.
 
 =item B<--install>, B<-i>
 
 downloads and installs patches. Patches are downloaded to /tmp or to 
-I<patchdir>, if set.
+I<patchdir>, if set. See I<TOKENS> on how to specify which patches are 
+installed.
+
+=item B<--list>, B<-l>
+
+lists patches. See I<TOKENS> on how to specify which patches are listed.
 
 =item B<--read>, B<-r>
 
 displays the patch readme section. The readme is read from the patchfile of
 the installed patch, a previously downloaded patch, or a freshly downloaded
 patch depending on the context. To force an up-to-date readme, see 
-the I<--force> argument.
+the I<--force> argument. See I<TOKENS> on how to specify which patches are read.
 
 =item B<--plist>, B<-p>
 
 displays the patch plist file. The plist is read from the plist file of
 the installed patch, a previously downloaded patch, or a freshly downloaded
 patch depending on the context. To force an up-to-date plist, see 
-the I<--force> argument.
+the I<--force> argument. See I<TOKENS> on how to specify which patches are
+processed.
 
 =back
+
+=head1 TOKENS
+
+.
 
 =head1 OPTIONS
 
@@ -858,10 +988,6 @@ sets an alternate root system directory when applying patches
 =item B<--show-defaults>
 
 prints all default values of options that can be overridden
-
-=item B<--show-installed>
-
-prints all installed patches. See I<--db>.
 
 =item B<--tar>=I<FILE>
 
