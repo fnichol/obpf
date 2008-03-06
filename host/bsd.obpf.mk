@@ -238,6 +238,10 @@ _DISTFILES_OS ?= \
 	${OSREV}/${MACHINE}/man${OSrev}.tgz \
 	${OSREV}/${MACHINE}/misc${OSrev}.tgz \
 	${OSREV}/${MACHINE}/xbase${OSrev}.tgz \
+	${OSREV}/${MACHINE}/xetc${OSrev}.tgz \
+	${OSREV}/${MACHINE}/xfont${OSrev}.tgz \
+	${OSREV}/${MACHINE}/xserv${OSrev}.tgz \
+	${OSREV}/${MACHINE}/xshare${OSrev}.tgz
 
 # Default OpenBSD source tar blobs to fetch
 _DISTFILES_SRC ?= \
