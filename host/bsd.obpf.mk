@@ -31,6 +31,7 @@ BASENAME = /usr/bin/basename
 CAT = /bin/cat
 CHMOD = /bin/chmod
 CHROOT = /usr/sbin/chroot
+CKSUM = /bin/cksum
 CP = /bin/cp
 DIRNAME = /usr/bin/dirname
 ECHO = /bin/echo
@@ -157,7 +158,13 @@ ECHO_MSG ?= ${ECHO}
 # Used to fetch any remote file
 FETCH_CMD ?= ${FTP} -V -m
 
+.if ${OSrev} < 46
 CHECKSUM_FILE ?= ${FULLDISTDIR}/${OSREV}/${MACHINE}/MD5
+_CHECKSUM_FORMAT = MD5
+.else
+CHECKSUM_FILE ?= ${FULLDISTDIR}/${OSREV}/${MACHINE}/SHA256
+_CHECKSUM_FORMAT = SHA256
+.endif
 
 CHROOT_SHELL ?= ${KSH} -li
 
@@ -231,7 +238,7 @@ _SITE_SELECTOR += *) sites="${MASTER_SITES}";; esac
 
 # Default OpenBSD packages tar blobs to fetch
 _DISTFILES_OS ?= \
-	${OSREV}/${MACHINE}/MD5 \
+	${OSREV}/${MACHINE}/${_CHECKSUM_FORMAT} \
 	${OSREV}/${MACHINE}/base${OSrev}.tgz \
 	${OSREV}/${MACHINE}/etc${OSrev}.tgz \
 	${OSREV}/${MACHINE}/comp${OSrev}.tgz \
@@ -317,10 +324,10 @@ _internal-checksum: _internal-fetch
 	for file in ${_DISTFILES_OS}; do \
 		filename=`basename $$file`; \
 		if [ "$$filename" == "${CHECKSUM_FILE:T}" ]; then continue; fi; \
-		if ! ${GREP} "^MD5 ($$filename) = " ${CHECKSUM_FILE} > /dev/null; then \
+		if ! ${GREP} "^${_CHECKSUM_FORMAT} ($$filename) = " ${CHECKSUM_FILE} > /dev/null; then \
 			${ECHO_MSG} ">> Warning: No checksum recorded for $$file."; \
 		else \
-			${GREP} "^MD5 ($$filename) = " ${CHECKSUM_FILE} | ${MD5} -c; \
+			${GREP} "^${_CHECKSUM_FORMAT} ($$filename) = " ${CHECKSUM_FILE} | ${CKSUM} -a ${_CHECKSUM_FORMAT} -c; \
 			if [ "$$?" -ne "0" ]; then \
 				echo ">> Checksum mismatch for $$file."; \
 				OK=false; \
