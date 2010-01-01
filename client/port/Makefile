@@ -35,7 +35,7 @@ CATEGORIES=		sysutils
 # If you no longer use the port, or are unwilling/unable to handle issues
 # in a timely manner, *leave the field blank*.
 # Default value is ports@openbsd.org, no need to fill in
-MAINTAINER=		Fletcher Nichol <fnichol-ports@nichol.ca>
+MAINTAINER=		Fletcher Nichol <fletcher@silversky.ca>
 
 PERMIT_PACKAGE_CDROM=	Yes
 PERMIT_PACKAGE_FTP=	Yes
@@ -44,7 +44,10 @@ PERMIT_DISTFILES_FTP=	Yes
 
 NO_CHECKSUM=	true
 
-do-fetch:
+DISTFILES=
+PATCHFILES=
+
+fetch:
 
 do-checksum:
 
@@ -59,6 +62,6 @@ do-configure:
 do-build:
 
 do-install:
-	@${INSTALL_PROGRAM} ${FILESDIR}/obpf ${PREFIX}/bin
+	@${INSTALL_SCRIPT} ${FILESDIR}/obpf ${PREFIX}/bin
 
 .include <bsd.port.mk>
